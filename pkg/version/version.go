@@ -13,6 +13,7 @@ var (
 	GoArch    = runtime.GOARCH
 )
 
+//nolint:gocritic
 func Revision() string {
 	bi, ok := debug.ReadBuildInfo()
 

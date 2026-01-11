@@ -97,21 +97,27 @@ func (c *Config) validateDefaults() error {
 }
 
 func (c *Config) validateMaxEventAgeSeconds() error {
-	if c.ThrottlePeriod == 0 && c.MaxEventAgeSeconds == 0 {
-		c.MaxEventAgeSeconds = 5
-		log.Info().Msg("setting config.maxEventAgeSeconds=5 (default)")
-	} else if c.ThrottlePeriod != 0 && c.MaxEventAgeSeconds != 0 {
-		log.Error().Msg("cannot set both throttlePeriod (depricated) and MaxEventAgeSeconds")
+	// If both are set, that's an error.
+	if c.ThrottlePeriod != 0 && c.MaxEventAgeSeconds != 0 {
+		log.Error().Msg("cannot set both throttlePeriod (deprecated) and MaxEventAgeSeconds")
 		return errors.New("validateMaxEventAgeSeconds failed")
-	} else if c.ThrottlePeriod != 0 {
-		log_value := strconv.FormatInt(c.ThrottlePeriod, 10)
-		log.Info().Msg("config.maxEventAgeSeconds=" + log_value)
-		log.Warn().Msg("config.throttlePeriod is depricated, consider using config.maxEventAgeSeconds instead")
-		c.MaxEventAgeSeconds = c.ThrottlePeriod
-	} else {
-		log_value := strconv.FormatInt(c.MaxEventAgeSeconds, 10)
-		log.Info().Msg("config.maxEventAgeSeconds=" + log_value)
 	}
+
+	// If throttlePeriod is set, use it but warn it's deprecated.
+	if c.ThrottlePeriod != 0 {
+		c.MaxEventAgeSeconds = c.ThrottlePeriod
+		log.Warn().Msg("config.throttlePeriod is deprecated, consider using config.maxEventAgeSeconds instead")
+	}
+
+	// If still zero, set default.
+	if c.MaxEventAgeSeconds == 0 {
+		c.MaxEventAgeSeconds = 5
+		log.Info().Int64("maxEventAgeSeconds", c.MaxEventAgeSeconds).Msg("setting config.maxEventAgeSeconds to default")
+		return nil
+	}
+
+	// Final log of the effective value.
+	log.Info().Int64("maxEventAgeSeconds", c.MaxEventAgeSeconds).Msg("config.maxEventAgeSeconds")
 	return nil
 }
 

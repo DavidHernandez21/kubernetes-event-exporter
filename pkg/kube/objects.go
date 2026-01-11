@@ -55,7 +55,7 @@ func NewObjectMetadataProvider(size, mappingCacheSize int) ObjectMetadataProvide
 func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
 	// ResourceVersion changes when the object is updated.
 	// We use "UID/ResourceVersion" as cache key so that if the object is updated we get the new metadata.
-	cacheKey := strings.Join([]string{string(reference.UID), reference.ResourceVersion}, "/")
+	cacheKey := string(reference.UID) + "/" + reference.ResourceVersion
 	if val, ok := o.cache.Get(cacheKey); ok {
 		metricsStore.KubeApiReadCacheHits.Inc()
 		return val, nil
@@ -71,7 +71,7 @@ func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, c
 		version = s[1]
 	}
 
-	mappingKey := strings.Join([]string{group, version, reference.Kind}, "|")
+	mappingKey := group + "|" + version + "|" + reference.Kind
 
 	var gvr schema.GroupVersionResource
 	if val, ok := o.mappingCache.Get(mappingKey); ok {

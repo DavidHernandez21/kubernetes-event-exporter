@@ -64,8 +64,8 @@ func TestValidate_IsCheckingMaxEventAgeSeconds_WhenThrottledPeriodSet(t *testing
 	err := config.Validate()
 
 	assert.True(t, config.MaxEventAgeSeconds == 123)
-	assert.Contains(t, output.String(), "config.maxEventAgeSeconds=123")
-	assert.Contains(t, output.String(), "config.throttlePeriod is depricated, consider using config.maxEventAgeSeconds instead")
+	assert.Contains(t, output.String(), `"maxEventAgeSeconds":123`)
+	assert.Contains(t, output.String(), "config.throttlePeriod is deprecated")
 	assert.NoError(t, err)
 }
 
@@ -78,7 +78,7 @@ func TestValidate_IsCheckingMaxEventAgeSeconds_WhenMaxEventAgeSecondsSet(t *test
 	}
 	err := config.Validate()
 	assert.True(t, config.MaxEventAgeSeconds == 123)
-	assert.Contains(t, output.String(), "config.maxEventAgeSeconds=123")
+	assert.Contains(t, output.String(), `"maxEventAgeSeconds":123`)
 	assert.NoError(t, err)
 }
 
@@ -92,7 +92,7 @@ func TestValidate_IsCheckingMaxEventAgeSeconds_WhenMaxEventAgeSecondsAndThrottle
 	}
 	err := config.Validate()
 	assert.Error(t, err)
-	assert.Contains(t, output.String(), "cannot set both throttlePeriod (depricated) and MaxEventAgeSeconds")
+	assert.Contains(t, output.String(), "cannot set both throttlePeriod (deprecated) and MaxEventAgeSeconds")
 }
 
 func TestValidate_MetricsNamePrefix_WhenEmpty(t *testing.T) {

@@ -32,6 +32,7 @@ func (r *ReceiverConfig) Validate() error {
 	return nil
 }
 
+//nolint:gocyclo
 func (r *ReceiverConfig) GetSink() (Sink, error) {
 	if r.InMemory != nil {
 		// This reference is used for test purposes to count the events in the sink.

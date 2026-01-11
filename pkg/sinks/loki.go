@@ -28,8 +28,8 @@ type LokiConfig struct {
 	Layout       map[string]any    `yaml:"layout"`
 	StreamLabels map[string]string `yaml:"streamLabels"`
 	Headers      map[string]string `yaml:"headers"`
-	TLS          TLS               `yaml:"tls"`
 	URL          string            `yaml:"url"`
+	TLS          TLS               `yaml:"tls"`
 }
 
 type Loki struct {

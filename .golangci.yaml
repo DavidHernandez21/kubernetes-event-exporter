@@ -125,3 +125,6 @@ linters:
           - staticcheck
         text: "QF1008:"
         path: pkg/kube/watcher.go
+      - linters:
+          - gosec
+        text: "G108: Profiling endpoint is automatically exposed on /debug/pprof"
