@@ -15,8 +15,8 @@ import (
 
 // LeaderElectionConfig is used to enable leader election
 type LeaderElectionConfig struct {
-	Enabled          bool   `yaml:"enabled"`
 	LeaderElectionID string `yaml:"leaderElectionID"`
+	Enabled          bool   `yaml:"enabled"`
 }
 
 const (

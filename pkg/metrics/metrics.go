@@ -2,7 +2,9 @@ package metrics
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,38 +13,42 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/resmoio/kubernetes-event-exporter/pkg/version"
-	"github.com/rs/zerolog/log"
 )
 
 type Store struct {
-	EventsProcessed      prometheus.Counter
-	EventsDiscarded      prometheus.Counter
-	WatchErrors          prometheus.Counter
-	SendErrors           prometheus.Counter
-	BuildInfo            prometheus.GaugeFunc
-	KubeApiReadCacheHits prometheus.Counter
-	KubeApiReadRequests  prometheus.Counter
+	EventsProcessed            prometheus.Counter
+	EventsDiscarded            prometheus.Counter
+	WatchErrors                prometheus.Counter
+	SendErrors                 prometheus.Counter
+	BuildInfo                  prometheus.GaugeFunc
+	KubeApiReadCacheHits       prometheus.Counter
+	KubeApiMappingCacheHits    prometheus.Counter
+	KubeApiReadRequests        prometheus.Counter
+	KubeApiMappingReadRequests prometheus.Counter
 }
 
-// promLogger implements promhttp.Logger
-type promLogger struct{}
-
-func (pl promLogger) Println(v ...interface{}) {
-	log.Logger.Error().Msg(fmt.Sprint(v...))
+// parseLogLevel parses a textual log level and returns a slog.Level.
+// On parse error or empty input it returns slog.LevelInfo as a safe fallback.
+func parseLogLevel(s string) slog.Level {
+	var lvl slog.Level
+	if s == "" {
+		return slog.LevelInfo
+	}
+	if err := (&lvl).UnmarshalText([]byte(s)); err != nil {
+		return slog.LevelInfo
+	}
+	return lvl
 }
 
-// promLogger implements the Logger interface
-func (pl promLogger) Log(v ...interface{}) error {
-	log.Logger.Info().Msg(fmt.Sprint(v...))
-	return nil
-}
-
-func Init(addr string, tlsConf string) {
+func Init(addr string, tlsConf string, logLevel string) {
 	// Setup the prometheus metrics machinery
 	// Add Go module build info.
 	prometheus.MustRegister(collectors.NewBuildInfoCollector())
 
-	promLogger := promLogger{}
+	lvl := parseLogLevel(logLevel)
+	handleOptions := slog.HandlerOptions{Level: lvl}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &handleOptions))
+
 	metricsPath := "/metrics"
 
 	// Expose the registered metrics via HTTP.
@@ -64,7 +70,10 @@ func Init(addr string, tlsConf string) {
 			},
 		},
 	}
-	landingPage, _ := web.NewLandingPage(landingConfig)
+	landingPage, err := web.NewLandingPage(landingConfig)
+	if err != nil {
+		slog.Error("Failed to create landing page", "error", err)
+	}
 	http.Handle("/", landingPage)
 
 	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +95,11 @@ func Init(addr string, tlsConf string) {
 	}
 
 	// start up the http listener to expose the metrics
-	go web.ListenAndServe(&metricsServer, &metricsFlags, promLogger)
+	go func() {
+		if err := web.ListenAndServe(&metricsServer, &metricsFlags, logger); err != nil {
+			slog.Error("Failed to start metrics server", "error", err)
+		}
+	}()
 }
 
 func NewMetricsStore(name_prefix string) *Store {
@@ -129,6 +142,14 @@ func NewMetricsStore(name_prefix string) *Store {
 			Name: name_prefix + "kube_api_read_cache_misses",
 			Help: "The total number of read requests served from kube-apiserver when looking up object metadata",
 		}),
+		KubeApiMappingCacheHits: promauto.NewCounter(prometheus.CounterOpts{
+			Name: name_prefix + "kube_api_mapping_cache_hits",
+			Help: "The total number of read requests served from cache when looking up object metadata mapping",
+		}),
+		KubeApiMappingReadRequests: promauto.NewCounter(prometheus.CounterOpts{
+			Name: name_prefix + "kube_api_mapping_cache_misses",
+			Help: "The total number of read requests served from kube-apiserver when looking up object metadata mapping",
+		}),
 	}
 }
 
@@ -140,5 +161,7 @@ func DestroyMetricsStore(store *Store) {
 	prometheus.Unregister(store.BuildInfo)
 	prometheus.Unregister(store.KubeApiReadCacheHits)
 	prometheus.Unregister(store.KubeApiReadRequests)
+	prometheus.Unregister(store.KubeApiMappingCacheHits)
+	prometheus.Unregister(store.KubeApiMappingReadRequests)
 	store = nil
 }

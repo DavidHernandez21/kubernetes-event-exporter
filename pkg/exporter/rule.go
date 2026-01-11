@@ -24,10 +24,10 @@ type Rule struct {
 	Namespace   string
 	Reason      string
 	Type        string
-	MinCount    int32 `yaml:"minCount"`
 	Component   string
 	Host        string
 	Receiver    string
+	MinCount    int32 `yaml:"minCount"`
 }
 
 // MatchesEvent compares the rule to an event and returns a boolean value to indicate
@@ -58,7 +58,7 @@ func (r *Rule) MatchesEvent(ev *kube.EnhancedEvent) bool {
 	}
 
 	// Labels are also mutually exclusive, they all need to be present
-	if r.Labels != nil && len(r.Labels) > 0 {
+	if len(r.Labels) > 0 {
 		for k, v := range r.Labels {
 			if val, ok := ev.InvolvedObject.Labels[k]; !ok {
 				return false
@@ -72,7 +72,7 @@ func (r *Rule) MatchesEvent(ev *kube.EnhancedEvent) bool {
 	}
 
 	// Annotations are also mutually exclusive, they all need to be present
-	if r.Annotations != nil && len(r.Annotations) > 0 {
+	if len(r.Annotations) > 0 {
 		for k, v := range r.Annotations {
 			if val, ok := ev.InvolvedObject.Annotations[k]; !ok {
 				return false

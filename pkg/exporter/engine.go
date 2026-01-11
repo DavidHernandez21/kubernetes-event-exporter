@@ -9,12 +9,13 @@ import (
 
 // Engine is responsible for initializing the receivers from sinks
 type Engine struct {
-	Route    Route
 	Registry ReceiverRegistry
+	Route    Route
 }
 
 func NewEngine(config *Config, registry ReceiverRegistry) *Engine {
-	for _, v := range config.Receivers {
+	for i := range config.Receivers {
+		v := &config.Receivers[i]
 		sink, err := v.GetSink()
 		if err != nil {
 			log.Fatal().Err(err).Str("name", v.Name).Msg("Cannot initialize sink")

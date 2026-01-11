@@ -4,8 +4,9 @@ import (
 	"context"
 	"strings"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
+	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,11 +16,12 @@ import (
 )
 
 type ObjectMetadataProvider interface {
-	GetObjectMetadata(reference *v1.ObjectReference, clientset *kubernetes.Clientset, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error)
+	GetObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error)
 }
 
 type ObjectMetadataCache struct {
-	cache *lru.ARCCache
+	cache        *lru.TwoQueueCache[string, ObjectMetadata]
+	mappingCache *lru.TwoQueueCache[string, schema.GroupVersionResource]
 }
 
 var _ ObjectMetadataProvider = &ObjectMetadataCache{}
@@ -31,26 +33,32 @@ type ObjectMetadata struct {
 	Deleted         bool
 }
 
-func NewObjectMetadataProvider(size int) ObjectMetadataProvider {
-	cache, err := lru.NewARC(size)
+func NewObjectMetadataProvider(size int, mappingCacheSize int) ObjectMetadataProvider {
+	cache, err := lru.New2Q[string, ObjectMetadata](size)
 	if err != nil {
 		panic("cannot init cache: " + err.Error())
 	}
 
+	mappingCache, err := lru.New2Q[string, schema.GroupVersionResource](mappingCacheSize)
+	if err != nil {
+		panic("cannot init mapping cache: " + err.Error())
+	}
+
 	var o ObjectMetadataProvider = &ObjectMetadataCache{
-		cache: cache,
+		cache:        cache,
+		mappingCache: mappingCache,
 	}
 
 	return o
 }
 
-func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, clientset *kubernetes.Clientset, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
+func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
 	// ResourceVersion changes when the object is updated.
 	// We use "UID/ResourceVersion" as cache key so that if the object is updated we get the new metadata.
 	cacheKey := strings.Join([]string{string(reference.UID), reference.ResourceVersion}, "/")
 	if val, ok := o.cache.Get(cacheKey); ok {
 		metricsStore.KubeApiReadCacheHits.Inc()
-		return val.(ObjectMetadata), nil
+		return val, nil
 	}
 
 	var group, version string
@@ -63,21 +71,34 @@ func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, c
 		version = s[1]
 	}
 
-	gk := schema.GroupKind{Group: group, Kind: reference.Kind}
+	mappingKey := strings.Join([]string{group, version, reference.Kind}, "|")
 
-	groupResources, err := restmapper.GetAPIGroupResources(clientset.Discovery())
-	if err != nil {
-		return ObjectMetadata{}, err
-	}
+	var gvr schema.GroupVersionResource
+	if val, ok := o.mappingCache.Get(mappingKey); ok {
+		metricsStore.KubeApiMappingCacheHits.Inc()
+		log.Debug().Str("mappingKey", mappingKey).Msg("mapping cache hit")
+		gvr = val
+	} else {
 
-	rm := restmapper.NewDiscoveryRESTMapper(groupResources)
-	mapping, err := rm.RESTMapping(gk, version)
-	if err != nil {
-		return ObjectMetadata{}, err
+		groupResources, err := restmapper.GetAPIGroupResources(clientset.Discovery())
+		if err != nil {
+			return ObjectMetadata{}, err
+		}
+		rm := restmapper.NewDiscoveryRESTMapper(groupResources)
+		gk := schema.GroupKind{Group: group, Kind: reference.Kind}
+		mapping, err := rm.RESTMapping(gk, version)
+		if err != nil {
+			return ObjectMetadata{}, err
+		}
+
+		metricsStore.KubeApiMappingReadRequests.Inc()
+		gvr = mapping.Resource
+
+		o.mappingCache.Add(mappingKey, gvr)
 	}
 
 	item, err := dynClient.
-		Resource(mapping.Resource).
+		Resource(gvr).
 		Namespace(reference.Namespace).
 		Get(context.Background(), reference.Name, metav1.GetOptions{})
 

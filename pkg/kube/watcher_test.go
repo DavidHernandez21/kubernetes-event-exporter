@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
 	"github.com/rs/zerolog/log"
@@ -21,12 +21,13 @@ import (
 )
 
 type mockObjectMetadataProvider struct {
-	cache      *lru.ARCCache
-	objDeleted bool
+	cache        *lru.TwoQueueCache[string, ObjectMetadata]
+	mappingCache *lru.TwoQueueCache[string, schema.GroupVersionResource]
+	objDeleted   bool
 }
 
 func newMockObjectMetadataProvider() ObjectMetadataProvider {
-	cache, err := lru.NewARC(1024)
+	cache, err := lru.New2Q[string, ObjectMetadata](1024)
 	if err != nil {
 		panic("cannot init cache: " + err.Error())
 	}
@@ -44,21 +45,27 @@ func newMockObjectMetadataProvider() ObjectMetadataProvider {
 		},
 	})
 
+	mappingCache, err := lru.New2Q[string, schema.GroupVersionResource](256)
+	if err != nil {
+		panic("cannot init mapping cache: " + err.Error())
+	}
+
 	var o ObjectMetadataProvider = &mockObjectMetadataProvider{
-		cache:      cache,
-		objDeleted: false,
+		cache:        cache,
+		mappingCache: mappingCache,
+		objDeleted:   false,
 	}
 
 	return o
 }
 
-func (o *mockObjectMetadataProvider) GetObjectMetadata(reference *corev1.ObjectReference, clientset *kubernetes.Clientset, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
+func (o *mockObjectMetadataProvider) GetObjectMetadata(reference *corev1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
 	if o.objDeleted {
 		return ObjectMetadata{}, errors.NewNotFound(schema.GroupResource{}, "")
 	}
 
 	val, _ := o.cache.Get("test")
-	return val.(ObjectMetadata), nil
+	return val, nil
 }
 
 var _ ObjectMetadataProvider = &mockObjectMetadataProvider{}

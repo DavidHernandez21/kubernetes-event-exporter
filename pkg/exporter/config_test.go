@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -157,4 +158,101 @@ func TestSetDefaults(t *testing.T) {
 	require.Equal(t, DefaultCacheSize, config.CacheSize)
 	require.Equal(t, rest.DefaultQPS, config.KubeQPS)
 	require.Equal(t, rest.DefaultBurst, config.KubeBurst)
+}
+
+func TestSetDefaults_MappingCacheSizeEnv(t *testing.T) {
+	tests := []struct {
+		name              string
+		cfg               Config
+		envValue          *string
+		wantSize          int
+		wantLogSubstrings []string
+	}{
+		{
+			name:     "no config and no env uses default",
+			cfg:      Config{},
+			envValue: nil,
+			wantSize: DefaultMappingCacheSize,
+			wantLogSubstrings: []string{
+				"no mappingCacheSizeOverride set; using max of 1/4 cacheSize or",
+			},
+		},
+		{
+			name:     "no env and config use too small cache value uses default",
+			cfg:      Config{CacheSize: 10},
+			envValue: nil,
+			wantSize: DefaultMappingCacheSize,
+			wantLogSubstrings: []string{
+				"no mappingCacheSizeOverride set; using max of 1/4 cacheSize or",
+			},
+		},
+		{
+			name:     "no env and config use larger cache value uses quarter of cache size",
+			cfg:      Config{CacheSize: 2048},
+			envValue: nil,
+			wantSize: 512,
+			wantLogSubstrings: []string{
+				"no mappingCacheSizeOverride set; using max of 1/4 cacheSize or",
+			},
+		},
+		{
+			name: "config value takes precedence over env",
+			cfg: Config{
+				MappingCacheSize: 128,
+			},
+			envValue: func() *string { v := "256"; return &v }(),
+			wantSize: 128,
+			wantLogSubstrings: []string{
+				"setting config.mappingCacheSize from config",
+			},
+		},
+		{
+			name:     "valid env value is used",
+			cfg:      Config{},
+			envValue: func() *string { v := "256"; return &v }(),
+			wantSize: 256,
+			wantLogSubstrings: []string{
+				"using MAPPING_CACHE_SIZE from environment",
+			},
+		},
+		{
+			name:     "invalid non-numeric env leaves size at zero and logs warning",
+			cfg:      Config{},
+			envValue: func() *string { v := "not-a-number"; return &v }(),
+			wantSize: 0,
+			wantLogSubstrings: []string{
+				"invalid MAPPING_CACHE_SIZE value; expected positive integer",
+			},
+		},
+		{
+			name:     "zero env value leaves size at zero and logs warning",
+			cfg:      Config{},
+			envValue: func() *string { v := "0"; return &v }(),
+			wantSize: 0,
+			wantLogSubstrings: []string{
+				"invalid MAPPING_CACHE_SIZE value; expected positive integer",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Ensure env is clean, then optionally set it.
+			os.Unsetenv("MAPPING_CACHE_SIZE")
+			if tt.envValue != nil {
+				t.Setenv("MAPPING_CACHE_SIZE", *tt.envValue)
+			}
+
+			output := &bytes.Buffer{}
+			log.Logger = log.Logger.Output(output)
+
+			config := tt.cfg
+			config.SetDefaults()
+
+			require.Equal(t, tt.wantSize, config.MappingCacheSize)
+			for _, substr := range tt.wantLogSubstrings {
+				assert.Contains(t, output.String(), substr)
+			}
+		})
+	}
 }

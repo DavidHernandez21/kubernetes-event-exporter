@@ -10,6 +10,7 @@ import (
 )
 
 type SlackConfig struct {
+	Fields     map[string]string `yaml:"fields"`
 	Token      string            `yaml:"token"`
 	Channel    string            `yaml:"channel"`
 	Message    string            `yaml:"message"`
@@ -17,7 +18,6 @@ type SlackConfig struct {
 	Footer     string            `yaml:"footer"`
 	Title      string            `yaml:"title"`
 	AuthorName string            `yaml:"author_name"`
-	Fields     map[string]string `yaml:"fields"`
 }
 
 type SlackSink struct {

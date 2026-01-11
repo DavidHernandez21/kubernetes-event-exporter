@@ -29,9 +29,9 @@ import (
 //
 
 type Avro struct {
+	codec    *goavro.Codec
 	SchemaID string `yaml:"schemaID"`
 	Schema   string `yaml:"schema"`
-	codec    *goavro.Codec
 }
 
 func (a Avro) encode(textual []byte) ([]byte, error) {

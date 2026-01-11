@@ -1,0 +1,84 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # Default set of linters.
+  # The value can be:
+  # - `standard`: https://golangci-lint.run/usage/linters/#enabled-by-default
+  # - `all`: enables all linters by default.
+  # - `none`: disables all linters by default.
+  # - `fast`: enables only linters considered as "fast" (`golangci-lint help linters --json | jq '[ .[] | select(.fast==true) ] | map(.name)'`).
+  # Default: standard
+  default: none
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
+  enable:
+    - staticcheck
+    - prealloc
+    - contextcheck
+    - dupl
+    - goconst
+    - gocritic
+    - gocyclo
+    - predeclared
+    - unparam
+    - usestdlibvars
+    - bodyclose
+    - dogsled
+    - errcheck
+    - exhaustive
+    - errorlint
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - nakedret
+    - thelper
+    - tparallel
+    - unconvert
+
+  settings:
+    gosec:
+      excludes:
+        - G404 # Insecure random number source (rand). causes false positives.
+    prealloc:
+      # IMPORTANT: we don't recommend using this linter before doing performance profiling.
+      # For most programs usage of prealloc will be a premature optimization.
+
+      # Report pre-allocation suggestions only on simple loops that have no returns/breaks/continues/gotos in them.
+      # Default: true
+      simple: true
+      # Report pre-allocation suggestions on range loops.
+      # Default: true
+      range-loops: true
+      # Report pre-allocation suggestions on for loops.
+      # Default: false
+      for-loops: true
+    errcheck:
+      # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-type-assertions: true
+
+      # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-blank: true
+    gocritic:
+      # Run `GL_DEBUG=gocritic golangci-lint run --enable=gocritic` to see all tags and checks.
+      # See https://github.com/go-critic/go-critic#usage -> section "Tags".
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - experimental
+        - opinionated
+      disabled-checks:
+        - commentedOutCode
+    govet:
+      enable-all: true
+    gocyclo:
+      min-complexity: 15

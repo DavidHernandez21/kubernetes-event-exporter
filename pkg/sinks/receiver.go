@@ -4,7 +4,6 @@ import "errors"
 
 // Receiver allows receiving
 type ReceiverConfig struct {
-	Name          string               `yaml:"name"`
 	InMemory      *InMemoryConfig      `yaml:"inMemory"`
 	Webhook       *WebhookConfig       `yaml:"webhook"`
 	File          *FileConfig          `yaml:"file"`
@@ -26,6 +25,7 @@ type ReceiverConfig struct {
 	BigQuery      *BigQueryConfig      `yaml:"bigquery"`
 	EventBridge   *EventBridgeConfig   `yaml:"eventbridge"`
 	Pipe          *PipeConfig          `yaml:"pipe"`
+	Name          string               `yaml:"name"`
 }
 
 func (r *ReceiverConfig) Validate() error {

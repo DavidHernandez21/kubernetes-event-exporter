@@ -16,9 +16,9 @@ import (
 // and we might need a mechanism to drop the vents
 // On closing, the registry sends a signal on all exit channels, and then waits for all to complete.
 type ChannelBasedReceiverRegistry struct {
-	ch     map[string]chan kube.EnhancedEvent
-	exitCh map[string]chan interface{}
-	wg     *sync.WaitGroup
+	ch           map[string]chan kube.EnhancedEvent
+	exitCh       map[string]chan interface{}
+	wg           *sync.WaitGroup
 	MetricsStore *metrics.Store
 }
 
@@ -48,9 +48,8 @@ func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink
 	if r.wg == nil {
 		r.wg = &sync.WaitGroup{}
 	}
-	r.wg.Add(1)
 
-	go func() {
+	r.wg.Go(func() {
 	Loop:
 		for {
 			select {
@@ -68,8 +67,7 @@ func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink
 		}
 		receiver.Close()
 		log.Info().Str("sink", name).Msg("Closed")
-		r.wg.Done()
-	}()
+	})
 }
 
 // Close signals closing to all sinks and waits for them to complete.

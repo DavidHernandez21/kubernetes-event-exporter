@@ -27,11 +27,11 @@ type BatchSink interface {
 }
 
 type TLS struct {
-	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
 	ServerName         string `yaml:"serverName"`
 	CaFile             string `yaml:"caFile"`
 	KeyFile            string `yaml:"keyFile"`
 	CertFile           string `yaml:"certFile"`
+	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
 }
 
 func setupTLS(cfg *TLS) (*tls.Config, error) {
@@ -40,7 +40,7 @@ func setupTLS(cfg *TLS) (*tls.Config, error) {
 		ServerName:         cfg.ServerName,
 	}
 
-	if len(cfg.CaFile) > 0 {
+	if cfg.CaFile != "" {
 		readFile, err := os.ReadFile(cfg.CaFile)
 		if err != nil {
 			return nil, err
@@ -50,17 +50,17 @@ func setupTLS(cfg *TLS) (*tls.Config, error) {
 		tlsClientConfig.RootCAs.AppendCertsFromPEM(readFile)
 	}
 
-	if len(cfg.KeyFile) > 0 && len(cfg.CertFile) > 0 {
+	if cfg.KeyFile != "" && cfg.CertFile != "" {
 		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("could not read client certificate or key: %w", err)
 		}
 		tlsClientConfig.Certificates = append(tlsClientConfig.Certificates, cert)
 	}
-	if len(cfg.KeyFile) > 0 && len(cfg.CertFile) == 0 {
+	if cfg.KeyFile != "" && cfg.CertFile == "" {
 		return nil, errors.New("configured keyFile but forget certFile for client certificate authentication")
 	}
-	if len(cfg.KeyFile) == 0 && len(cfg.CertFile) > 0 {
+	if cfg.KeyFile == "" && cfg.CertFile != "" {
 		return nil, errors.New("configured certFile but forget keyFile for client certificate authentication")
 	}
 	return tlsClientConfig, nil

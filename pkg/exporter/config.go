@@ -3,6 +3,7 @@ package exporter
 import (
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 
@@ -13,34 +14,54 @@ import (
 )
 
 const (
-	DefaultCacheSize = 1024
+	DefaultCacheSize        = 1024
+	DefaultMappingCacheSize = DefaultCacheSize / 4
 )
 
 // Config allows configuration
 type Config struct {
+	LeaderElection kube.LeaderElectionConfig `yaml:"leaderElection"`
 	// Route is the top route that the events will match
 	// TODO: There is currently a tight coupling with route and config, but not with receiver config and sink so
 	// TODO: I am not sure what to do here.
-	LogLevel           string                    `yaml:"logLevel"`
-	LogFormat          string                    `yaml:"logFormat"`
-	ThrottlePeriod     int64                     `yaml:"throttlePeriod"`
-	MaxEventAgeSeconds int64                     `yaml:"maxEventAgeSeconds"`
-	ClusterName        string                    `yaml:"clusterName,omitempty"`
-	Namespace          string                    `yaml:"namespace"`
-	LeaderElection     kube.LeaderElectionConfig `yaml:"leaderElection"`
-	Route              Route                     `yaml:"route"`
-	Receivers          []sinks.ReceiverConfig    `yaml:"receivers"`
-	KubeQPS            float32                   `yaml:"kubeQPS,omitempty"`
-	KubeBurst          int                       `yaml:"kubeBurst,omitempty"`
-	MetricsNamePrefix  string                    `yaml:"metricsNamePrefix,omitempty"`
-	OmitLookup         bool                      `yaml:"omitLookup,omitempty"`
-	CacheSize          int                       `yaml:"cacheSize,omitempty"`
+	LogLevel           string                 `yaml:"logLevel"`
+	LogFormat          string                 `yaml:"logFormat"`
+	ClusterName        string                 `yaml:"clusterName,omitempty"`
+	Namespace          string                 `yaml:"namespace"`
+	MetricsNamePrefix  string                 `yaml:"metricsNamePrefix,omitempty"`
+	Route              Route                  `yaml:"route"`
+	Receivers          []sinks.ReceiverConfig `yaml:"receivers"`
+	ThrottlePeriod     int64                  `yaml:"throttlePeriod"`
+	MaxEventAgeSeconds int64                  `yaml:"maxEventAgeSeconds"`
+	KubeBurst          int                    `yaml:"kubeBurst,omitempty"`
+	CacheSize          int                    `yaml:"cacheSize,omitempty"`
+	MappingCacheSize   int                    `yaml:"mappingCacheSize,omitempty"`
+	KubeQPS            float32                `yaml:"kubeQPS,omitempty"`
+	OmitLookup         bool                   `yaml:"omitLookup,omitempty"`
 }
 
 func (c *Config) SetDefaults() {
 	if c.CacheSize == 0 {
 		c.CacheSize = DefaultCacheSize
 		log.Debug().Msg("setting config.cacheSize=1024 (default)")
+	}
+
+	if c.MappingCacheSize > 0 {
+		log.Debug().Int("mappingCacheSize", c.MappingCacheSize).Msg("setting config.mappingCacheSize from config")
+	} else {
+		// Fallback to environment variable if set
+		if v, ok := os.LookupEnv("MAPPING_CACHE_SIZE"); ok {
+			if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+				c.MappingCacheSize = parsed
+				log.Debug().Int("mappingCacheSizeOverride", parsed).Msg("using MAPPING_CACHE_SIZE from environment")
+			} else {
+				log.Warn().Str("MAPPING_CACHE_SIZE", v).Msg("invalid MAPPING_CACHE_SIZE value; expected positive integer")
+			}
+		} else {
+			log.Debug().Msg("no mappingCacheSizeOverride set; using max of 1/4 cacheSize or 1024/4 (default)")
+			c.MappingCacheSize = max(DefaultMappingCacheSize, c.CacheSize/4)
+		}
+
 	}
 
 	if c.KubeBurst == 0 {

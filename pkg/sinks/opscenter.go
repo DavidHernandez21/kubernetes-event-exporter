@@ -14,17 +14,17 @@ import (
 
 // OpsCenterConfig is the configuration of the Sink.
 type OpsCenterConfig struct {
+	OperationalData map[string]string `yaml:"operationalData"`
+	Tags            map[string]string `yaml:"tags"`
 	Category        string            `yaml:"category"`
 	Description     string            `yaml:"description"`
-	Notifications   []string          `yaml:"notifications"`
-	OperationalData map[string]string `yaml:"operationalData"`
 	Priority        string            `yaml:"priority"`
 	Region          string            `yaml:"region"`
-	RelatedOpsItems []string          `yaml:"relatedOpsItems"`
 	Severity        string            `yaml:"severity"`
 	Source          string            `yaml:"source"`
-	Tags            map[string]string `yaml:"tags"`
 	Title           string            `yaml:"title"`
+	Notifications   []string          `yaml:"notifications"`
+	RelatedOpsItems []string          `yaml:"relatedOpsItems"`
 }
 
 // OpsCenterSink is an AWS OpsCenter notifcation path.

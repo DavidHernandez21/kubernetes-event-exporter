@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -17,10 +20,11 @@ import (
 )
 
 var (
-	conf       = flag.String("conf", "config.yaml", "The config path file")
-	addr       = flag.String("metrics-address", ":2112", "The address to listen on for HTTP requests.")
-	kubeconfig = flag.String("kubeconfig", "", "Path to the kubeconfig file to use.")
-	tlsConf    = flag.String("metrics-tls-config", "", "The TLS config file for your metrics.")
+	conf        = flag.String("conf", "config.yaml", "The config path file")
+	addr        = flag.String("metrics-address", ":2112", "The address to listen on for HTTP requests.")
+	kubeconfig  = flag.String("kubeconfig", "", "Path to the kubeconfig file to use.")
+	tlsConf     = flag.String("metrics-tls-config", "", "The TLS config file for your metrics.")
+	enablePprof = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 )
 
 func main() {
@@ -50,16 +54,49 @@ func main() {
 		log.Logger = log.With().Caller().Logger().Level(zerolog.InfoLevel)
 	}
 
-	if cfg.LogFormat == "json" {
-		// Defaults to JSON already nothing to do
-	} else if cfg.LogFormat == "" || cfg.LogFormat == "pretty" {
+	switch cfg.LogFormat {
+	case "json":
+	// Defaults to JSON already nothing to do
+	case "", "pretty":
 		log.Logger = log.Logger.Output(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
 			NoColor:    false,
 			TimeFormat: time.RFC3339,
 		})
-	} else {
+	default:
 		log.Fatal().Str("log_format", cfg.LogFormat).Msg("Unknown log format")
+	}
+
+	enablePprofEffective := *enablePprof
+	var enablePprofFlagSet bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "enable-pprof" {
+			enablePprofFlagSet = true
+		}
+	})
+	if !enablePprofFlagSet {
+		if v := os.Getenv("ENABLE_PPROF"); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				enablePprofEffective = b
+			} else {
+				log.Warn().Str("ENABLE_PPROF", v).Msg("invalid ENABLE_PPROF value; expected boolean")
+			}
+		}
+	}
+
+	if enablePprofEffective {
+		go func() {
+			log.Info().Msg("pprof profiler enabled on :6060")
+			server := &http.Server{
+				Addr:              ":6060",
+				ReadHeaderTimeout: 5 * time.Second,
+			}
+			if err := server.ListenAndServe(); err != nil {
+				// Do not use log.Fatal here as it would kill the whole application
+				log.Error().Err(err).Msg("pprof ListenAndServe failed")
+				return
+			}
+		}()
 	}
 
 	cfg.SetDefaults()
@@ -77,12 +114,12 @@ func main() {
 	kubecfg.QPS = cfg.KubeQPS
 	kubecfg.Burst = cfg.KubeBurst
 
-	metrics.Init(*addr, *tlsConf)
+	metrics.Init(*addr, *tlsConf, cfg.LogLevel)
 	metricsStore := metrics.NewMetricsStore(cfg.MetricsNamePrefix)
 
 	engine := exporter.NewEngine(&cfg, &exporter.ChannelBasedReceiverRegistry{MetricsStore: metricsStore})
 	onEvent := engine.OnEvent
-	if len(cfg.ClusterName) != 0 {
+	if cfg.ClusterName != "" {
 		onEvent = func(event *kube.EnhancedEvent) {
 			// note that per code this value is not set anywhere on the kubernetes side
 			// https://github.com/kubernetes/apimachinery/blob/v0.22.4/pkg/apis/meta/v1/types.go#L276
@@ -91,7 +128,27 @@ func main() {
 		}
 	}
 
-	w := kube.NewEventWatcher(kubecfg, cfg.Namespace, cfg.MaxEventAgeSeconds, metricsStore, onEvent, cfg.OmitLookup, cfg.CacheSize)
+	eventWatcherRequired, err := kube.NewEventWatcherRequired(
+		kube.WithCacheSize(cfg.CacheSize),
+		kube.WithMappingCacheSize(cfg.MappingCacheSize),
+		kube.WithMaxEventAgeSeconds(cfg.MaxEventAgeSeconds),
+		kube.WithMetricsStore(metricsStore),
+		kube.WithOnEventHandler(onEvent),
+		kube.WithNamespace(cfg.Namespace),
+		kube.WithOmitLookup(cfg.OmitLookup),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create EventWatcherRequired")
+	}
+
+	w, err := kube.NewEventWatcher(kubecfg, eventWatcherRequired)
+
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create event watcher")
+		engine.Stop()
+		metrics.DestroyMetricsStore(metricsStore)
+		os.Exit(1)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -126,7 +183,11 @@ func main() {
 			},
 		)
 		if err != nil {
-			log.Fatal().Err(err).Msg("create leaderelector failed")
+			log.Error().Err(err).Msg("create leaderelector failed")
+			cancel()
+			w.Stop()
+			engine.Stop()
+			return
 		}
 
 		// Run returns if either the context is canceled or client stopped holding the leader lease

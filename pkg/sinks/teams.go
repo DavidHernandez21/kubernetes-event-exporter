@@ -13,9 +13,9 @@ import (
 )
 
 type TeamsConfig struct {
-	Endpoint string                 `yaml:"endpoint"`
 	Layout   map[string]interface{} `yaml:"layout"`
 	Headers  map[string]string      `yaml:"headers"`
+	Endpoint string                 `yaml:"endpoint"`
 }
 
 func NewTeamsSink(cfg *TeamsConfig) (Sink, error) {

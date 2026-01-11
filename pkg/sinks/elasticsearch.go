@@ -18,22 +18,22 @@ import (
 )
 
 type ElasticsearchConfig struct {
-	// Connection specific
-	Hosts    []string          `yaml:"hosts"`
-	Username string            `yaml:"username"`
-	Password string            `yaml:"password"`
-	CloudID  string            `yaml:"cloudID"`
-	APIKey   string            `yaml:"apiKey"`
-	Headers  map[string]string `yaml:"headers"` // Can be used to append additional key value pairs into the request headers
-	// Indexing preferences
-	UseEventID bool `yaml:"useEventID"`
-	// DeDot all labels and annotations in the event. For both the event and the involvedObject
-	DeDot       bool                   `yaml:"deDot"`
+	Headers     map[string]string      `yaml:"headers"` // Can be used to append additional key value pairs into the request headers
+	Layout      map[string]interface{} `yaml:"layout"`
+	TLS         TLS                    `yaml:"tls"`
+	Username    string                 `yaml:"username"`
+	Password    string                 `yaml:"password"`
+	CloudID     string                 `yaml:"cloudID"`
+	APIKey      string                 `yaml:"apiKey"`
 	Index       string                 `yaml:"index"`
 	IndexFormat string                 `yaml:"indexFormat"`
 	Type        string                 `yaml:"type"`
-	TLS         TLS                    `yaml:"tls"`
-	Layout      map[string]interface{} `yaml:"layout"`
+	// Connection specific
+	Hosts []string `yaml:"hosts"`
+	// Indexing preferences
+	UseEventID bool `yaml:"useEventID"`
+	// DeDot all labels and annotations in the event. For both the event and the involvedObject
+	DeDot bool `yaml:"deDot"`
 }
 
 func NewElasticsearch(cfg *ElasticsearchConfig) (*Elasticsearch, error) {
