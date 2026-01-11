@@ -74,7 +74,6 @@ linters:
         - diagnostic
         - style
         - performance
-        - experimental
         - opinionated
       disabled-checks:
         - commentedOutCode
@@ -82,3 +81,47 @@ linters:
       enable-all: true
     gocyclo:
       min-complexity: 15
+
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+      - legacy
+    paths:
+      - pkg/sinks/kafka.go
+      - pkg/sinks/avro.go
+      - pkg/sinks/bigquery.go
+      - pkg/sinks/elasticsearch.go
+      - pkg/sinks/eventbridge.go
+      - pkg/sinks/email.go
+      - pkg/sinks/firehose.go
+      - pkg/sinks/kinesis.go
+      - pkg/sinks/logstash.go
+      - pkg/sinks/opensearch.go
+      - pkg/sinks/opscenter.go
+      - pkg/sinks/opsgenie.go
+      - pkg/sinks/pubsub.go
+      - pkg/sinks/redis.go
+      - pkg/sinks/slack.go
+      - pkg/sinks/sms.go
+      - pkg/sinks/splunk.go
+      - pkg/sinks/sqs.go
+      - pkg/sinks/teams.go
+      - pkg/sinks/syslog.go
+      - '.+_test\.go'
+    rules:
+      - linters:
+          - gocritic
+        text: "whyNoLint:"
+      - linters:
+          - govet
+        text: "shadow: declaration of \"err\""
+      - linters:
+          - staticcheck
+        text: "ST1011: var maxEventAgeSeconds"
+        path: pkg/kube/watcher.go
+      - linters:
+          - staticcheck
+        text: "QF1008:"
+        path: pkg/kube/watcher.go

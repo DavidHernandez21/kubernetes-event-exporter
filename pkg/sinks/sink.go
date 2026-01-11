@@ -34,6 +34,7 @@ type TLS struct {
 	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
 }
 
+//nolint:gosec
 func setupTLS(cfg *TLS) (*tls.Config, error) {
 	tlsClientConfig := &tls.Config{
 		InsecureSkipVerify: cfg.InsecureSkipVerify,

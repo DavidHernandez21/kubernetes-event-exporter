@@ -3,6 +3,7 @@ package sinks
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -54,8 +55,11 @@ func convertTemplate(value any, ev *kube.EnhancedEvent) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			// TODO: It's a bit dangerous
-			strKeysMap[k.(string)] = res
+			keyStr, ok := k.(string)
+			if !ok {
+				return nil, fmt.Errorf("template map key has non-string type %T; only string keys are supported", k)
+			}
+			strKeysMap[keyStr] = res
 		}
 		return strKeysMap, nil
 	case map[string]any:

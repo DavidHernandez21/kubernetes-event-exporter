@@ -33,7 +33,7 @@ type ObjectMetadata struct {
 	Deleted         bool
 }
 
-func NewObjectMetadataProvider(size int, mappingCacheSize int) ObjectMetadataProvider {
+func NewObjectMetadataProvider(size, mappingCacheSize int) ObjectMetadataProvider {
 	cache, err := lru.New2Q[string, ObjectMetadata](size)
 	if err != nil {
 		panic("cannot init cache: " + err.Error())

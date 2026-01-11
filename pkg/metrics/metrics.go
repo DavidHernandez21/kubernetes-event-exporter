@@ -40,7 +40,7 @@ func parseLogLevel(s string) slog.Level {
 	return lvl
 }
 
-func Init(addr string, tlsConf string, logLevel string) {
+func Init(addr, tlsConf, logLevel string) {
 	// Setup the prometheus metrics machinery
 	// Add Go module build info.
 	prometheus.MustRegister(collectors.NewBuildInfoCollector())

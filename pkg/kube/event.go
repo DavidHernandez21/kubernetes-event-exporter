@@ -52,6 +52,9 @@ type EnhancedObjectReference struct {
 
 // ToJSON does not return an error because we are %99 confident it is JSON serializable.
 // TODO(makin) Is it a bad practice? It's open to discussion.
+// avoid errcheck linter
+//
+//nolint:errcheck
 func (e *EnhancedEvent) ToJSON() []byte {
 	b, _ := json.Marshal(e)
 	return b

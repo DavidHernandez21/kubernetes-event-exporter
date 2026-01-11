@@ -9,6 +9,8 @@ import (
 // matchString is a method to clean the code. Error handling is omitted here because these
 // rules are validated before use. According to regexp.MatchString, the only way it fails its
 // that the pattern does not compile.
+//
+//nolint:errcheck
 func matchString(pattern, s string) bool {
 	matched, _ := regexp.MatchString(pattern, s)
 	return matched

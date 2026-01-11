@@ -27,6 +27,7 @@ var (
 	enablePprof = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 )
 
+//nolint:gocyclo
 func main() {
 	flag.Parse()
 

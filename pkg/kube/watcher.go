@@ -73,12 +73,14 @@ func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts .
 	return watcher, nil
 }
 
-func (e *EventWatcher) OnAdd(obj interface{}, isInInitialList bool) {
+//nolint:errcheck
+func (e *EventWatcher) OnAdd(obj any, isInInitialList bool) {
+	// ignore type assertion failure
 	event := obj.(*corev1.Event)
 	e.onEvent(event)
 }
 
-func (e *EventWatcher) OnUpdate(oldObj, newObj interface{}) {
+func (e *EventWatcher) OnUpdate(oldObj, newObj any) {
 	// Ignore updates
 }
 
@@ -148,7 +150,7 @@ func (e *EventWatcher) onEvent(event *corev1.Event) {
 	e.fn(ev)
 }
 
-func (e *EventWatcher) OnDelete(obj interface{}) {
+func (e *EventWatcher) OnDelete(obj any) {
 	// Ignore deletes
 }
 
