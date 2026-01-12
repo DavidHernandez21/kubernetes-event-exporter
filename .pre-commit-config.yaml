@@ -11,4 +11,3 @@ repos:
       - id: check-json
       - id: debug-statements
       - id: detect-private-key
-      - id: requirements-txt-fixer

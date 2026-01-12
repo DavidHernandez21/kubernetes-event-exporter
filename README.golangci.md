@@ -5,5 +5,5 @@ You can run [golangci-lint](https://golangci-lint.run/) in a Docker container wi
 Remember to update the tag and version numbers as needed.
 
 ```bash
-docker run --rm -v ${PWD}:/app -v ~/.cache/golangci-lint/v2.7.2:/root/.cache -w /app golangci/golangci-lint:v2.7.2 golangci-lint run -v
+docker run --rm -v ${PWD}:/app -v ~/.cache/golangci-lint/v2.8.0:/root/.cache -w /app golangci/golangci-lint:v2.8.0 golangci-lint run -v
 ```
