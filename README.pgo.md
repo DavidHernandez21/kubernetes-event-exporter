@@ -71,3 +71,41 @@ This can be eventually used in production.
     ```
 
     Modify the `Dockerfile` to include the profile data and build the Go compiler with PGO
+
+## Dynamically enable PGO in your application
+
+You can also dynamically enable PGO in your Go applications by using the `ENABLE_PPROF` environment variable. for example using a `ConfigMap`:
+
+```yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-env
+  namespace: event-exporter
+data:
+  ENABLE_PPROF: "true"
+```
+
+Then mount this `ConfigMap` as environment variables in your deployment:
+
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-exporter
+  namespace: event-exporter
+spec:
+    template:
+      spec:
+        containers:
+        - name: event-exporter
+          image: your-image:tag
+          envFrom:
+          - configMapRef:
+              name: cm-env
+              optional: true
+```
+
+And restart the deployment to apply the changes.
