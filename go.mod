@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.162
 	github.com/elastic/go-elasticsearch/v7 v7.17.7
 	github.com/goccy/go-yaml v1.11.0
-	github.com/hashicorp/golang-lru v0.5.3
+	github.com/hashicorp/golang-lru v1.0.2
 	github.com/linkedin/goavro/v2 v2.12.0
 	github.com/opensearch-project/opensearch-go v1.1.0
 	github.com/opsgenie/opsgenie-go-sdk-v2 v1.2.14
