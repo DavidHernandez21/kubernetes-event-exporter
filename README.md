@@ -1,12 +1,11 @@
 # kubernetes-event-exporter
 
-> **Note**: This is an active fork of [Opsgenie Kubernetes Event Exporter](https://github.com/opsgenie/kubernetes-event-exporter)
-since that is not maintained since November 2021. Development is sponsored by [Resmo](https://www.resmo.com).
-
-> This tool is presented at [KubeCon 2019 San Diego](https://kccncna19.sched.com/event/6aa61eca397e4ff2bdbb2845e5aebb81).
+> This tool was presented at [KubeCon 2019 San Diego](https://kccncna19.sched.com/event/6aa61eca397e4ff2bdbb2845e5aebb81).
 
 This tool allows exporting the often missed Kubernetes events to various outputs so that they can be used for
 observability or alerting purposes. You won't believe what you are missing.
+
+I think exporting to sinks should be done outside of this repository. For simplicity I will not modify the current implementation, but in the future it would be better to have a plugin based architecture so that users can add their own sinks without modifying the core code.
 
 ## Deployment
 
@@ -32,8 +31,7 @@ resources:
 
 ### Helm
 
-Please use [Bitnami Chart](https://github.com/bitnami/charts/tree/main/bitnami/kubernetes-event-exporter/) which is 
-comprehensive.
+Please use [Bitnami Chart](https://github.com/bitnami/charts/tree/main/bitnami/kubernetes-event-exporter/) which is comprehensive.
 
 ## Configuration
 
@@ -76,7 +74,7 @@ receivers:
 
 ## Using Secrets
 
-In your config file, you can refer to environment variables as `${API_KEY}` therefore you can use ConfigMap or Secrets 
+In your config file, you can refer to environment variables as `${API_KEY}` therefore you can use ConfigMap or Secrets
 to keep the config file clean of secrets.
 
 ## Troubleshoot "Events Discarded" warning:

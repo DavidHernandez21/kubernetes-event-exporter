@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,16 +25,17 @@ type LokiMsg struct {
 }
 
 type LokiConfig struct {
-	Layout       map[string]interface{} `yaml:"layout"`
-	StreamLabels map[string]string      `yaml:"streamLabels"`
-	TLS          TLS                    `yaml:"tls"`
-	URL          string                 `yaml:"url"`
-	Headers      map[string]string      `yaml:"headers"`
+	Layout       map[string]any    `yaml:"layout"`
+	StreamLabels map[string]string `yaml:"streamLabels"`
+	Headers      map[string]string `yaml:"headers"`
+	URL          string            `yaml:"url"`
+	TLS          TLS               `yaml:"tls"`
 }
 
 type Loki struct {
 	cfg       *LokiConfig
 	transport *http.Transport
+	client    *http.Client
 }
 
 func NewLoki(cfg *LokiConfig) (Sink, error) {
@@ -41,14 +43,22 @@ func NewLoki(cfg *LokiConfig) (Sink, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup TLS: %w", err)
 	}
-	return &Loki{cfg: cfg, transport: &http.Transport{
+
+	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsClientConfig,
-	}}, nil
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
+	return &Loki{cfg: cfg, transport: transport, client: client}, nil
 }
 
 func generateTimestamp() string {
-	return strconv.FormatInt(time.Now().Unix(), 10) + "000000000"
+	return strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
 func (l *Loki) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
@@ -67,7 +77,8 @@ func (l *Loki) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, l.cfg.URL, bytes.NewBuffer(reqBody))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, l.cfg.URL, bytes.NewReader(reqBody))
 	if err != nil {
 		return err
 	}
@@ -85,21 +96,25 @@ func (l *Loki) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 		}
 	}
 
-	client := http.DefaultClient
-	resp, err := client.Do(req)
+	resp, err := l.client.Do(req)
 	if err != nil {
 		return err
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to close response body")
+		}
+	}()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	if !(resp.StatusCode >= 200 && resp.StatusCode < 300) {
-		return errors.New("not successfull (2xx) response: " + string(body))
+	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
+		return errors.New("not successful (2xx) response: " + string(body))
 	}
 
 	return nil

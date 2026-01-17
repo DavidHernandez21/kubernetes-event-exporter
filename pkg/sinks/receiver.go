@@ -4,7 +4,6 @@ import "errors"
 
 // Receiver allows receiving
 type ReceiverConfig struct {
-	Name          string               `yaml:"name"`
 	InMemory      *InMemoryConfig      `yaml:"inMemory"`
 	Webhook       *WebhookConfig       `yaml:"webhook"`
 	File          *FileConfig          `yaml:"file"`
@@ -26,12 +25,14 @@ type ReceiverConfig struct {
 	BigQuery      *BigQueryConfig      `yaml:"bigquery"`
 	EventBridge   *EventBridgeConfig   `yaml:"eventbridge"`
 	Pipe          *PipeConfig          `yaml:"pipe"`
+	Name          string               `yaml:"name"`
 }
 
 func (r *ReceiverConfig) Validate() error {
 	return nil
 }
 
+//nolint:gocyclo
 func (r *ReceiverConfig) GetSink() (Sink, error) {
 	if r.InMemory != nil {
 		// This reference is used for test purposes to count the events in the sink.

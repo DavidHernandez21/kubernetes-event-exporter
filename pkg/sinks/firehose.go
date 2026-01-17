@@ -11,9 +11,9 @@ import (
 )
 
 type FirehoseConfig struct {
+	Layout             map[string]interface{} `yaml:"layout"`
 	DeliveryStreamName string                 `yaml:"deliveryStreamName"`
 	Region             string                 `yaml:"region"`
-	Layout             map[string]interface{} `yaml:"layout"`
 	// DeDot all labels and annotations in the event. For both the event and the involvedObject
 	DeDot bool `yaml:"deDot"`
 }

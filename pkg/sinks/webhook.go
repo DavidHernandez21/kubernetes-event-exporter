@@ -13,10 +13,10 @@ import (
 )
 
 type WebhookConfig struct {
-	Endpoint string                 `yaml:"endpoint"`
-	TLS      TLS                    `yaml:"tls"`
 	Layout   map[string]interface{} `yaml:"layout"`
 	Headers  map[string]string      `yaml:"headers"`
+	Endpoint string                 `yaml:"endpoint"`
+	TLS      TLS                    `yaml:"tls"`
 }
 
 func NewWebhook(cfg *WebhookConfig) (Sink, error) {
@@ -75,8 +75,8 @@ func (w *Webhook) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 		return err
 	}
 
-	if !(resp.StatusCode >= 200 && resp.StatusCode < 300) {
-		return errors.New("not successfull (2xx) response: " + string(body))
+	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
+		return errors.New("not successful (2xx) response: " + string(body))
 	}
 
 	return nil

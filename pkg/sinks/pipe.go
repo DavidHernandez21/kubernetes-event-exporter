@@ -10,10 +10,10 @@ import (
 )
 
 type PipeConfig struct {
+	Layout map[string]interface{} `yaml:"layout"`
 	Path   string                 `yaml:"path"`
 	// DeDot all labels and annotations in the event. For both the event and the involvedObject
-	DeDot       bool              `yaml:"deDot"`
-	Layout map[string]interface{} `yaml:"layout"`
+	DeDot bool `yaml:"deDot"`
 }
 
 func (f *PipeConfig) Validate() error {
@@ -27,7 +27,7 @@ type Pipe struct {
 }
 
 func NewPipeSink(config *PipeConfig) (*Pipe, error) {
-	mode := os.FileMode(0644)
+	mode := os.FileMode(0o644)
 	f, err := os.OpenFile(config.Path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return nil, err

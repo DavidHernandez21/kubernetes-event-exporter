@@ -9,9 +9,9 @@ import (
 )
 
 type SQSConfig struct {
+	Layout    map[string]interface{} `yaml:"layout"`
 	QueueName string                 `yaml:"queueName"`
 	Region    string                 `yaml:"region"`
-	Layout    map[string]interface{} `yaml:"layout"`
 }
 
 type SQSSink struct {

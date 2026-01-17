@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -18,8 +20,11 @@ type EnhancedEvent struct {
 // DeDot replaces all dots in the labels and annotations with underscores. This is required for example in the
 // elasticsearch sink. The dynamic mapping generation interprets dots in JSON keys as as path in a onject.
 // For reference see this logstash filter: https://www.elastic.co/guide/en/logstash/current/plugins-filters-de_dot.html
-func (e EnhancedEvent) DeDot() EnhancedEvent {
-	c := e
+func (e *EnhancedEvent) DeDot() EnhancedEvent {
+	if e == nil {
+		return EnhancedEvent{}
+	}
+	c := *e
 	c.Labels = dedotMap(e.Labels)
 	c.Annotations = dedotMap(e.Annotations)
 	c.InvolvedObject.Labels = dedotMap(e.InvolvedObject.Labels)
@@ -50,7 +55,11 @@ type EnhancedObjectReference struct {
 // ToJSON does not return an error because we are %99 confident it is JSON serializable.
 // TODO(makin) Is it a bad practice? It's open to discussion.
 func (e *EnhancedEvent) ToJSON() []byte {
-	b, _ := json.Marshal(e)
+	b, err := json.Marshal(e)
+	if err != nil {
+		log.Warn().Err(err).Msg("Cannot serialize event to JSON. Returning empty JSON object")
+		return []byte("{}")
+	}
 	return b
 }
 

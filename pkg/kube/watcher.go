@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -20,49 +21,66 @@ var startUpTime = time.Now()
 type EventHandler func(event *EnhancedEvent)
 
 type EventWatcher struct {
-	wg                  sync.WaitGroup
 	informer            cache.SharedInformer
-	stopper             chan struct{}
 	objectMetadataCache ObjectMetadataProvider
-	omitLookup          bool
+	stopper             chan struct{}
 	fn                  EventHandler
-	maxEventAgeSeconds  time.Duration
 	metricsStore        *metrics.Store
 	dynamicClient       *dynamic.DynamicClient
 	clientset           *kubernetes.Clientset
+	wg                  sync.WaitGroup
+	maxEventAgeSeconds  time.Duration
+	omitLookup          bool
 }
 
-func NewEventWatcher(config *rest.Config, namespace string, MaxEventAgeSeconds int64, metricsStore *metrics.Store, fn EventHandler, omitLookup bool, cacheSize int) *EventWatcher {
+func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts ...EventWatcherOption) (*EventWatcher, error) {
+	var o eventWatcherConfig
+	o.eventWatcherRequired = *required
+
+	for _, opt := range opts {
+		if err := opt(&o); err != nil {
+			return nil, fmt.Errorf("applying option failed: %w", err)
+		}
+	}
+
 	clientset := kubernetes.NewForConfigOrDie(config)
-	factory := informers.NewSharedInformerFactoryWithOptions(clientset, 0, informers.WithNamespace(namespace))
+	factory := informers.NewSharedInformerFactoryWithOptions(clientset, 0, informers.WithNamespace(o.namespace))
 	informer := factory.Core().V1().Events().Informer()
 
 	watcher := &EventWatcher{
 		informer:            informer,
 		stopper:             make(chan struct{}),
-		objectMetadataCache: NewObjectMetadataProvider(cacheSize),
-		omitLookup:          omitLookup,
-		fn:                  fn,
-		maxEventAgeSeconds:  time.Second * time.Duration(MaxEventAgeSeconds),
-		metricsStore:        metricsStore,
+		objectMetadataCache: NewObjectMetadataProvider(o.cacheSize, o.mappingCacheSize),
+		omitLookup:          o.omitLookup,
+		fn:                  o.onEvent,
+		maxEventAgeSeconds:  time.Second * time.Duration(o.maxEventAgeSeconds),
+		metricsStore:        o.metricsStore,
 		dynamicClient:       dynamic.NewForConfigOrDie(config),
 		clientset:           clientset,
 	}
 
-	informer.AddEventHandler(watcher)
-	informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
-		watcher.metricsStore.WatchErrors.Inc()
-	})
+	_, err := informer.AddEventHandler(watcher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler: %w", err)
+	}
 
-	return watcher
+	if err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
+		watcher.metricsStore.WatchErrors.Inc()
+	}); err != nil {
+		return nil, fmt.Errorf("failed to set watch error handler: %w", err)
+	}
+
+	return watcher, nil
 }
 
-func (e *EventWatcher) OnAdd(obj interface{}) {
+//nolint:errcheck
+func (e *EventWatcher) OnAdd(obj any, isInInitialList bool) {
+	// ignore type assertion failure
 	event := obj.(*corev1.Event)
 	e.onEvent(event)
 }
 
-func (e *EventWatcher) OnUpdate(oldObj, newObj interface{}) {
+func (e *EventWatcher) OnUpdate(oldObj, newObj any) {
 	// Ignore updates
 }
 
@@ -132,7 +150,7 @@ func (e *EventWatcher) onEvent(event *corev1.Event) {
 	e.fn(ev)
 }
 
-func (e *EventWatcher) OnDelete(obj interface{}) {
+func (e *EventWatcher) OnDelete(obj any) {
 	// Ignore deletes
 }
 
@@ -149,6 +167,6 @@ func (e *EventWatcher) Stop() {
 	e.wg.Wait()
 }
 
-func (e *EventWatcher) setStartUpTime(time time.Time) {
-	startUpTime = time
+func (e *EventWatcher) setStartUpTime(t time.Time) {
+	startUpTime = t
 }

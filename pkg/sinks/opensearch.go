@@ -18,19 +18,19 @@ import (
 )
 
 type OpenSearchConfig struct {
-	// Connection specific
-	Hosts    []string `yaml:"hosts"`
-	Username string   `yaml:"username"`
-	Password string   `yaml:"password"`
-	// Indexing preferences
-	UseEventID bool `yaml:"useEventID"`
-	// DeDot all labels and annotations in the event. For both the event and the involvedObject
-	DeDot       bool                   `yaml:"deDot"`
+	Layout      map[string]interface{} `yaml:"layout"`
+	TLS         TLS                    `yaml:"tls"`
+	Username    string                 `yaml:"username"`
+	Password    string                 `yaml:"password"`
 	Index       string                 `yaml:"index"`
 	IndexFormat string                 `yaml:"indexFormat"`
 	Type        string                 `yaml:"type"`
-	TLS         TLS                    `yaml:"tls"`
-	Layout      map[string]interface{} `yaml:"layout"`
+	// Connection specific
+	Hosts []string `yaml:"hosts"`
+	// Indexing preferences
+	UseEventID bool `yaml:"useEventID"`
+	// DeDot all labels and annotations in the event. For both the event and the involvedObject
+	DeDot bool `yaml:"deDot"`
 }
 
 func NewOpenSearch(cfg *OpenSearchConfig) (*OpenSearch, error) {

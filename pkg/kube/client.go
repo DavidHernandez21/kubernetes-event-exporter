@@ -1,10 +1,12 @@
 package kube
 
 import (
+	"errors"
+	"os"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
 )
 
 // GetKubernetesClient returns the client if it's possible in cluster, otherwise tries to read HOME
@@ -18,7 +20,7 @@ func GetKubernetesClient() (*kubernetes.Clientset, error) {
 }
 
 func GetKubernetesConfig(kubeconfig string) (*rest.Config, error) {
-	if len(kubeconfig) > 0 {
+	if kubeconfig != "" {
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 
@@ -26,7 +28,7 @@ func GetKubernetesConfig(kubeconfig string) (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err == nil {
 		return config, nil
-	} else if err != rest.ErrNotInCluster {
+	} else if !errors.Is(err, rest.ErrNotInCluster) {
 		return nil, err
 	}
 

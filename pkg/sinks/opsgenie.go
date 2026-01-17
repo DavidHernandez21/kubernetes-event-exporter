@@ -2,12 +2,13 @@ package sinks
 
 import (
 	"context"
-	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 	"github.com/opsgenie/opsgenie-go-sdk-v2/alert"
 	"github.com/opsgenie/opsgenie-go-sdk-v2/client"
+	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 )
 
 type OpsgenieConfig struct {
+	Details     map[string]string `yaml:"details"`
 	ApiKey      string            `yaml:"apiKey"`
 	URL         client.ApiUrl     `yaml:"URL"`
 	Priority    string            `yaml:"priority"`
@@ -15,7 +16,6 @@ type OpsgenieConfig struct {
 	Alias       string            `yaml:"alias"`
 	Description string            `yaml:"description"`
 	Tags        []string          `yaml:"tags"`
-	Details     map[string]string `yaml:"details"`
 }
 
 type OpsgenieSink struct {

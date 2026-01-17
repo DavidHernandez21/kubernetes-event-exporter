@@ -1,11 +1,11 @@
-FROM golang:1.20 AS builder
+FROM golang:1.25.5 AS builder
 
 ARG VERSION
-ENV PKG github.com/resmoio/kubernetes-event-exporter/pkg
+ENV PKG=github.com/resmoio/kubernetes-event-exporter/pkg
 
-ADD . /app
+COPY . /app
 WORKDIR /app
-RUN CGO_ENABLED=0 GOOS=linux GO11MODULE=on go build -ldflags="-s -w -X ${PKG}/version.Version=${VERSION}" -a -o /main .
+RUN CGO_ENABLED=0 GOOS=linux GO11MODULE=on go build -pgo=/app/pgo/kind_07_01_26_17_45.pprof.samples.cpu.pb.gz.gz -ldflags="-s -w -X ${PKG}/version.Version=${VERSION}" -a -o /main .
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=builder --chown=nonroot:nonroot /main /kubernetes-event-exporter

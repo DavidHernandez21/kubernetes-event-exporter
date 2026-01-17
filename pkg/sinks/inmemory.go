@@ -10,8 +10,8 @@ type InMemoryConfig struct {
 }
 
 type InMemory struct {
-	Events []*kube.EnhancedEvent
 	Config *InMemoryConfig
+	Events []*kube.EnhancedEvent
 }
 
 func (i *InMemory) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
@@ -22,5 +22,3 @@ func (i *InMemory) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 func (i *InMemory) Close() {
 	// No-op
 }
-
-

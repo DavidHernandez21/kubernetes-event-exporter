@@ -13,7 +13,8 @@ type Route struct {
 
 func (r *Route) ProcessEvent(ev *kube.EnhancedEvent, registry ReceiverRegistry) {
 	// First determine whether we will drop the event: If any of the drop is matched, we break the loop
-	for _, v := range r.Drop {
+	for i := range r.Drop {
+		v := &r.Drop[i]
 		if v.MatchesEvent(ev) {
 			return
 		}
@@ -21,7 +22,8 @@ func (r *Route) ProcessEvent(ev *kube.EnhancedEvent, registry ReceiverRegistry) 
 
 	// It has match rules, it should go to the matchers
 	matchesAll := true
-	for _, rule := range r.Match {
+	for i := range r.Match {
+		rule := &r.Match[i]
 		if rule.MatchesEvent(ev) {
 			if rule.Receiver != "" {
 				registry.SendEvent(rule.Receiver, ev)

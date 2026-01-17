@@ -19,26 +19,26 @@ import (
 
 // KafkaConfig is the Kafka producer configuration
 type KafkaConfig struct {
-	Topic            string                 `yaml:"topic"`
-	Brokers          []string               `yaml:"brokers"`
-	Layout           map[string]interface{} `yaml:"layout"`
-	ClientId         string                 `yaml:"clientId"`
-	CompressionCodec string                 `yaml:"compressionCodec" default:"none"`
-	Version          string                 `yaml:"version"`
-	TLS              struct {
-		Enable             bool   `yaml:"enable"`
-		CaFile             string `yaml:"caFile"`
-		CertFile           string `yaml:"certFile"`
-		KeyFile            string `yaml:"keyFile"`
-		InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
-	} `yaml:"tls"`
-	SASL struct {
-		Enable    bool   `yaml:"enable"`
+	KafkaEncode Avro                   `yaml:"avro"`
+	Layout      map[string]interface{} `yaml:"layout"`
+	SASL        struct {
 		Username  string `yaml:"username"`
 		Password  string `yaml:"password"`
 		Mechanism string `yaml:"mechanism" default:"plain"`
+		Enable    bool   `yaml:"enable"`
 	} `yaml:"sasl"`
-	KafkaEncode Avro `yaml:"avro"`
+	Topic            string `yaml:"topic"`
+	ClientId         string `yaml:"clientId"`
+	CompressionCodec string `yaml:"compressionCodec" default:"none"`
+	Version          string `yaml:"version"`
+	TLS              struct {
+		CaFile             string `yaml:"caFile"`
+		CertFile           string `yaml:"certFile"`
+		KeyFile            string `yaml:"keyFile"`
+		Enable             bool   `yaml:"enable"`
+		InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
+	} `yaml:"tls"`
+	Brokers []string `yaml:"brokers"`
 }
 
 // KafkaEncoder is an interface type for adding an

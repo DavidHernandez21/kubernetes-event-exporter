@@ -9,9 +9,9 @@ import (
 )
 
 type SNSConfig struct {
+	Layout   map[string]interface{} `yaml:"layout"`
 	TopicARN string                 `yaml:"topicARN"`
 	Region   string                 `yaml:"region"`
-	Layout   map[string]interface{} `yaml:"layout"`
 }
 
 type SNSSink struct {

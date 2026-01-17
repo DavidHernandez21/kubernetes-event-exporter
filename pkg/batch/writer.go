@@ -5,19 +5,18 @@ import (
 	"time"
 )
 
-
 // Writer allows to buffer some items and call the Handler function either when the buffer is full or the timeout is
 // reached. There will also be support for concurrency for high volume. The handler function is supposed to return an
 // array of booleans to indicate whether the transfer was successful or not. It can be replaced with status codes in
 // the future to differentiate I/O errors, rate limiting, authorization issues.
 type Writer struct {
-	cfg      WriterConfig
 	Handler  Callback
-	buffer   []bufferItem
-	len      int
 	done     chan bool
 	stopDone chan bool
 	items    chan interface{}
+	buffer   []bufferItem
+	cfg      WriterConfig
+	len      int
 }
 
 type bufferItem struct {

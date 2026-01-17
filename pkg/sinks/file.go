@@ -10,8 +10,8 @@ import (
 )
 
 type FileConfig struct {
-	Path       string                 `yaml:"path"`
 	Layout     map[string]interface{} `yaml:"layout"`
+	Path       string                 `yaml:"path"`
 	MaxSize    int                    `yaml:"maxsize"`
 	MaxAge     int                    `yaml:"maxage"`
 	MaxBackups int                    `yaml:"maxbackups"`
