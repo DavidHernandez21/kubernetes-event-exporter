@@ -83,6 +83,12 @@ func (c *Config) Validate() error {
 		return err
 	}
 
+	// Precompile all regex patterns
+	err := c.PreCompilePatterns()
+	if err != nil {
+		return err
+	}
+
 	// No duplicate receivers
 	// Receivers individually
 	// Routers recursive
@@ -138,4 +144,108 @@ func (c *Config) validateMetricsNamePrefix() error {
 		log.Warn().Msg("metrics name prefix is empty, setting config.metricsNamePrefix='event_exporter_' is recommended")
 	}
 	return nil
+}
+
+// compilePattern compiles a regex pattern if it's not empty, returns nil otherwise
+func compilePattern(pattern string) (*regexp.Regexp, error) {
+	if pattern == "" {
+		return nil, nil
+	}
+	return regexp.Compile(pattern)
+}
+
+// compilePatternMap compiles all regex patterns in a map
+func compilePatternMap(patterns map[string]string) (map[string]*regexp.Regexp, error) {
+	if len(patterns) == 0 {
+		return nil, nil
+	}
+
+	compiled := make(map[string]*regexp.Regexp, len(patterns))
+	for k, v := range patterns {
+		re, err := compilePattern(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid regex pattern for key '%s': %w", k, err)
+		}
+		compiled[k] = re
+	}
+	return compiled, nil
+}
+
+// preCompilePatternsHelper precompiles regex patterns for a given rule
+func (c *Config) preCompilePatternsHelper(rule *Rule) error {
+	var err error
+	rule.aPIVersionPattern, err = compilePattern(rule.APIVersion)
+	if err != nil {
+		return err
+	}
+
+	rule.kindPattern, err = compilePattern(rule.Kind)
+	if err != nil {
+		return err
+	}
+	rule.namespacePattern, err = compilePattern(rule.Namespace)
+	if err != nil {
+		return err
+	}
+	rule.reasonPattern, err = compilePattern(rule.Reason)
+	if err != nil {
+		return err
+	}
+	rule.typePattern, err = compilePattern(rule.Type)
+	if err != nil {
+		return err
+	}
+	rule.componentPattern, err = compilePattern(rule.Component)
+	if err != nil {
+		return err
+	}
+	rule.hostPattern, err = compilePattern(rule.Host)
+	if err != nil {
+		return err
+	}
+	rule.messagePattern, err = compilePattern(rule.Message)
+	if err != nil {
+		return err
+	}
+	rule.receiverPattern, err = compilePattern(rule.Receiver)
+	if err != nil {
+		return err
+	}
+	rule.labelsPatterns, err = compilePatternMap(rule.Labels)
+	if err != nil {
+		return err
+	}
+	rule.annotationsPatterns, err = compilePatternMap(rule.Annotations)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// preCompileRoute precompiles regex patterns for all rules in a route, including nested routes
+func (c *Config) preCompileRoute(route *Route) error {
+	for i := range route.Drop {
+		if err := c.preCompilePatternsHelper(&route.Drop[i]); err != nil {
+			return err
+		}
+	}
+
+	for i := range route.Match {
+		if err := c.preCompilePatternsHelper(&route.Match[i]); err != nil {
+			return err
+		}
+	}
+
+	// Recursively compile patterns for nested Routes
+	for i := range route.Routes {
+		if err := c.preCompileRoute(&route.Routes[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) PreCompilePatterns() error {
+	return c.preCompileRoute(&c.Route)
 }

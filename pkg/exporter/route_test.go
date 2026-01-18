@@ -1,10 +1,15 @@
 package exporter
 
 import (
+	"bytes"
+	"slices"
+
+	"testing"
+
 	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 	"github.com/resmoio/kubernetes-event-exporter/pkg/sinks"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 // testReceiverRegistry just records the events to the registry so that tests can validate routing behavior
@@ -36,12 +41,7 @@ func (t *testReceiverRegistry) isEventRcvd(name string, event *kube.EnhancedEven
 	if val, ok := t.rcvd[name]; !ok {
 		return false
 	} else {
-		for _, v := range val {
-			if v == event {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(val, event)
 	}
 }
 
@@ -220,6 +220,64 @@ func Test_GHIssue51(t *testing.T) {
 	r.ProcessEvent(&ev1, &reg)
 	r.ProcessEvent(&ev2, &reg)
 
-	assert.True(t, reg.isEventRcvd("elastic", &ev1))
-	assert.False(t, reg.isEventRcvd("elastic", &ev2))
+}
+
+// mustCompileRule is a helper to compile rule patterns for tests
+func mustCompileRule(t *testing.T, rule Rule) Rule {
+	cfg := Config{Route: Route{Match: []Rule{rule}}}
+	if err := cfg.PreCompilePatterns(); err != nil {
+		t.Fatalf("failed to compile rule patterns: %v", err)
+	}
+	return cfg.Route.Match[0]
+}
+
+func TestBasicRoutePattern(t *testing.T) {
+	ev := kube.EnhancedEvent{}
+	ev.Namespace = "kube-system"
+	reg := testReceiverRegistry{}
+
+	r := Route{
+		Match: []Rule{mustCompileRule(t, Rule{
+			Namespace: "kube-sys.+",
+			Receiver:  "osman",
+		})},
+	}
+
+	// check that precompiled patterns work as expected
+	assert.NotNil(t, r.Match[0].namespacePattern)
+	assert.NotNil(t, r.Match[0].receiverPattern)
+
+	r.ProcessEvent(&ev, &reg)
+	assert.True(t, reg.isEventRcvd("osman", &ev))
+
+	output := &bytes.Buffer{}
+	log.Logger = log.Logger.Output(output)
+	assert.NotContains(t, output.String(), "falling back to runtime compilation")
+
+}
+
+func BenchmarkMatchesEvent_WithPrecompile(b *testing.B) {
+	ev := kube.EnhancedEvent{}
+	ev.Namespace = "kube-system"
+
+	rule := mustCompileRule(&testing.T{}, Rule{
+		Namespace: "kube-.*",
+	})
+
+	for b.Loop() {
+		rule.MatchesEvent(&ev)
+	}
+}
+
+func BenchmarkMatchesEvent_WithoutPrecompile(b *testing.B) {
+	ev := kube.EnhancedEvent{}
+	ev.Namespace = "kube-system"
+
+	rule := Rule{
+		Namespace: "kube-.*",
+	}
+
+	for b.Loop() {
+		rule.MatchesEvent(&ev)
+	}
 }

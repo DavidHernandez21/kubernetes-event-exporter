@@ -48,10 +48,10 @@ route:
     # This route allows dumping all events because it has no fields to match and no drop rules.
     - match:
         - receiver: dump
-    # This starts another route, drops all the events in *test* namespaces and Normal events
+    # This starts another route, drops all the events in .*test.* namespaces and Normal events
     # for capturing critical events
     - drop:
-        - namespace: "*test*"
+        - namespace: ".*test.*"
         - type: "Normal"
       match:
         - receiver: "critical-events-queue"

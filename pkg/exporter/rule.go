@@ -3,6 +3,8 @@ package exporter
 import (
 	"regexp"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 )
 
@@ -20,40 +22,73 @@ func matchString(pattern, s string) bool {
 type Rule struct {
 	Labels      map[string]string
 	Annotations map[string]string
-	Message     string
-	APIVersion  string `yaml:"apiVersion"`
-	Kind        string
-	Namespace   string
-	Reason      string
-	Type        string
-	Component   string
-	Host        string
-	Receiver    string
-	MinCount    int32 `yaml:"minCount"`
+
+	// Precompiled patterns. Populated when the rule is created.
+	labelsPatterns      map[string]*regexp.Regexp
+	annotationsPatterns map[string]*regexp.Regexp
+	aPIVersionPattern   *regexp.Regexp
+	kindPattern         *regexp.Regexp
+	namespacePattern    *regexp.Regexp
+	reasonPattern       *regexp.Regexp
+	typePattern         *regexp.Regexp
+	componentPattern    *regexp.Regexp
+	hostPattern         *regexp.Regexp
+	messagePattern      *regexp.Regexp
+	minCountPattern     *regexp.Regexp
+	receiverPattern     *regexp.Regexp
+
+	// Fields to match against
+	Message    string
+	APIVersion string `yaml:"apiVersion"`
+	Kind       string
+	Namespace  string
+	Reason     string
+	Type       string
+	Component  string
+	Host       string
+	Receiver   string
+	MinCount   int32 `yaml:"minCount"`
+}
+
+type fieldMatcher struct {
+	pattern   *regexp.Regexp
+	ruleName  string
+	eventName string
 }
 
 // MatchesEvent compares the rule to an event and returns a boolean value to indicate
 // whether the event is compatible with the rule. All fields are compared as regular expressions
 // so the user must keep that in mind while writing rules.
+//
+// Note: In production, patterns should be precompiled via PreCompilePatterns() during validation.
+// This method falls back to runtime compilation for testing and backward compatibility.
+//
+//nolint:gocyclo
 func (r *Rule) MatchesEvent(ev *kube.EnhancedEvent) bool {
-	// These rules are just basic comparison rules, if one of them fails, it means the event does not match the rule
-	rules := [][2]string{
-		{r.Message, ev.Message},
-		{r.APIVersion, ev.InvolvedObject.APIVersion},
-		{r.Kind, ev.InvolvedObject.Kind},
-		{r.Namespace, ev.Namespace},
-		{r.Reason, ev.Reason},
-		{r.Type, ev.Type},
-		{r.Component, ev.Source.Component},
-		{r.Host, ev.Source.Host},
+	// These matchers are just basic comparison matchers, if one of them fails, it means the event does not match the rule
+	matchers := []fieldMatcher{
+		{pattern: r.messagePattern, ruleName: r.Message, eventName: ev.Message},
+		{pattern: r.aPIVersionPattern, ruleName: r.APIVersion, eventName: ev.InvolvedObject.APIVersion},
+		{pattern: r.kindPattern, ruleName: r.Kind, eventName: ev.InvolvedObject.Kind},
+		{pattern: r.namespacePattern, ruleName: r.Namespace, eventName: ev.Namespace},
+		{pattern: r.reasonPattern, ruleName: r.Reason, eventName: ev.Reason},
+		{pattern: r.typePattern, ruleName: r.Type, eventName: ev.Type},
+		{pattern: r.componentPattern, ruleName: r.Component, eventName: ev.Source.Component},
+		{pattern: r.hostPattern, ruleName: r.Host, eventName: ev.Source.Host},
 	}
 
-	for _, v := range rules {
-		rule := v[0]
-		value := v[1]
-		if rule != "" {
-			matches := matchString(rule, value)
-			if !matches {
+	for _, m := range matchers {
+		if m.ruleName == "" {
+			continue
+		}
+
+		if m.pattern != nil {
+			if !m.pattern.MatchString(m.eventName) {
+				return false
+			}
+		} else {
+			log.Debug().Msgf("Rule field '%s' is not precompiled, falling back to runtime compilation", m.ruleName)
+			if !matchString(m.ruleName, m.eventName) {
 				return false
 			}
 		}
@@ -62,11 +97,18 @@ func (r *Rule) MatchesEvent(ev *kube.EnhancedEvent) bool {
 	// Labels are also mutually exclusive, they all need to be present
 	if len(r.Labels) > 0 {
 		for k, v := range r.Labels {
-			if val, ok := ev.InvolvedObject.Labels[k]; !ok {
+			val, ok := ev.InvolvedObject.Labels[k]
+			if !ok {
 				return false
+			}
+
+			if pattern := r.labelsPatterns[k]; pattern != nil {
+				if !pattern.MatchString(val) {
+					return false
+				}
 			} else {
-				matches := matchString(v, val)
-				if !matches {
+				log.Debug().Msgf("Rule label '%s' is not precompiled, falling back to runtime compilation", k)
+				if !matchString(v, val) {
 					return false
 				}
 			}
@@ -76,11 +118,18 @@ func (r *Rule) MatchesEvent(ev *kube.EnhancedEvent) bool {
 	// Annotations are also mutually exclusive, they all need to be present
 	if len(r.Annotations) > 0 {
 		for k, v := range r.Annotations {
-			if val, ok := ev.InvolvedObject.Annotations[k]; !ok {
+			val, ok := ev.InvolvedObject.Annotations[k]
+			if !ok {
 				return false
+			}
+
+			if pattern := r.annotationsPatterns[k]; pattern != nil {
+				if !pattern.MatchString(val) {
+					return false
+				}
 			} else {
-				matches := matchString(v, val)
-				if !matches {
+				log.Debug().Msgf("Rule annotation '%s' is not precompiled, falling back to runtime compilation", k)
+				if !matchString(v, val) {
 					return false
 				}
 			}

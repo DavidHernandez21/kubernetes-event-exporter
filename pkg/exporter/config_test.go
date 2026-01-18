@@ -3,6 +3,7 @@ package exporter
 import (
 	"bytes"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -160,6 +161,27 @@ func TestSetDefaults(t *testing.T) {
 	require.Equal(t, rest.DefaultBurst, config.KubeBurst)
 }
 
+func TestValidate_FailsOnInvalidRegexPattern(t *testing.T) {
+	const yml = `
+route:
+  drop:
+    - apiVersion: "[invalid"
+  match:
+    - receiver: alert
+      kind: "*(unclosed"
+      labels:
+        app: "++invalid"
+receivers:
+  - name: alert
+    stdout: {}
+`
+
+	cfg := readConfig(t, yml)
+	err := cfg.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error parsing regexp")
+}
+
 func TestSetDefaults_MappingCacheSizeEnv(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -255,4 +277,236 @@ func TestSetDefaults_MappingCacheSizeEnv(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompilePattern(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		wantNil bool
+	}{
+		{
+			name:    "empty pattern returns nil",
+			pattern: "",
+			wantNil: true,
+		},
+		{
+			name:    "valid simple pattern compiles",
+			pattern: "Pod",
+			wantNil: false,
+		},
+		{
+			name:    "valid wildcard pattern compiles",
+			pattern: ".*test.*",
+			wantNil: false,
+		},
+		{
+			name:    "valid alternation pattern compiles",
+			pattern: "Pod|Deployment|ReplicaSet",
+			wantNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := compilePattern(tt.pattern)
+			assert.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, result)
+			} else {
+				assert.NotNil(t, result)
+				// Verify it's a valid compiled regex
+				assert.IsType(t, &regexp.Regexp{}, result)
+			}
+		})
+	}
+}
+
+func TestCompilePatternMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		patterns map[string]string
+		wantNil  bool
+		wantLen  int
+	}{
+		{
+			name:     "empty map returns nil",
+			patterns: map[string]string{},
+			wantNil:  true,
+		},
+		{
+			name:     "nil map returns nil",
+			patterns: nil,
+			wantNil:  true,
+		},
+		{
+			name: "single pattern compiles",
+			patterns: map[string]string{
+				"version": "dev",
+			},
+			wantNil: false,
+			wantLen: 1,
+		},
+		{
+			name: "multiple patterns compile",
+			patterns: map[string]string{
+				"version": "dev",
+				"app":     "my-app",
+				"env":     "prod|staging",
+			},
+			wantNil: false,
+			wantLen: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := compilePatternMap(tt.patterns)
+			assert.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, result)
+			} else {
+				assert.NotNil(t, result)
+				assert.Len(t, result, tt.wantLen)
+				// Verify all values are compiled regexes
+				for k, v := range result {
+					assert.NotNil(t, v, "pattern for key %s should not be nil", k)
+					assert.IsType(t, &regexp.Regexp{}, v)
+				}
+			}
+		})
+	}
+}
+
+func TestPreCompilePatterns(t *testing.T) {
+	const yml = `
+route:
+  drop:
+    - namespace: "kube-system"
+      type: "Normal"
+  match:
+    - receiver: stdout
+      kind: "Pod|Deployment"
+  routes:
+    - drop:
+        - minCount: 6
+          apiVersion: "v.*"
+      match:
+        - receiver: alert
+          namespace: ".*prod.*"
+          labels:
+            app: "critical-.*"
+            env: "production"
+          annotations:
+            monitor: "true"
+receivers:
+  - name: stdout
+    stdout: {}
+  - name: alert
+    stdout: {}
+`
+
+	cfg := readConfig(t, yml)
+
+	// Precompile patterns
+	err := cfg.PreCompilePatterns()
+	assert.NoError(t, err)
+
+	// Test top-level Drop rules
+	assert.NotNil(t, cfg.Route.Drop[0].namespacePattern)
+	assert.NotNil(t, cfg.Route.Drop[0].typePattern)
+	assert.Nil(t, cfg.Route.Drop[0].kindPattern) // Not set, should be nil
+
+	// Test top-level Match rules
+	assert.NotNil(t, cfg.Route.Match[0].receiverPattern)
+	assert.NotNil(t, cfg.Route.Match[0].kindPattern)
+
+	// Test nested route Drop rules
+	assert.NotNil(t, cfg.Route.Routes[0].Drop[0].aPIVersionPattern)
+	assert.Equal(t, int32(6), cfg.Route.Routes[0].Drop[0].MinCount)
+
+	// Test nested route Match rules with labels and annotations
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].receiverPattern)
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].namespacePattern)
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].labelsPatterns)
+	assert.Len(t, cfg.Route.Routes[0].Match[0].labelsPatterns, 2)
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].labelsPatterns["app"])
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].labelsPatterns["env"])
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].annotationsPatterns)
+	assert.Len(t, cfg.Route.Routes[0].Match[0].annotationsPatterns, 1)
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].annotationsPatterns["monitor"])
+
+	// Verify patterns actually match correctly
+	matched := cfg.Route.Match[0].kindPattern.MatchString("Pod")
+	assert.True(t, matched)
+
+	matched = cfg.Route.Match[0].kindPattern.MatchString("Deployment")
+	assert.True(t, matched)
+
+	matched = cfg.Route.Match[0].kindPattern.MatchString("Service")
+	assert.False(t, matched)
+}
+
+func TestPreCompilePatterns_DeepNesting(t *testing.T) {
+	const yml = `
+route:
+  routes:
+    - match:
+        - receiver: level1
+          kind: "Pod"
+      routes:
+        - match:
+            - receiver: level2
+              namespace: "default"
+          routes:
+            - match:
+                - receiver: level3
+                  type: "Warning"
+receivers:
+  - name: level1
+    stdout: {}
+  - name: level2
+    stdout: {}
+  - name: level3
+    stdout: {}
+`
+
+	cfg := readConfig(t, yml)
+	err := cfg.PreCompilePatterns()
+	assert.NoError(t, err)
+
+	// Test level 1
+	assert.NotNil(t, cfg.Route.Routes[0].Match[0].kindPattern)
+
+	// Test level 2
+	assert.NotNil(t, cfg.Route.Routes[0].Routes[0].Match[0].namespacePattern)
+
+	// Test level 3
+	assert.NotNil(t, cfg.Route.Routes[0].Routes[0].Routes[0].Match[0].typePattern)
+}
+
+func TestPreCompilePatterns_EmptyFields(t *testing.T) {
+	const yml = `
+route:
+  match:
+    - receiver: stdout
+receivers:
+  - name: stdout
+    stdout: {}
+`
+
+	cfg := readConfig(t, yml)
+	err := cfg.PreCompilePatterns()
+	assert.NoError(t, err)
+
+	rule := cfg.Route.Match[0]
+
+	// Only receiver is set, all others should be nil
+	assert.NotNil(t, rule.receiverPattern)
+	assert.Nil(t, rule.kindPattern)
+	assert.Nil(t, rule.namespacePattern)
+	assert.Nil(t, rule.typePattern)
+	assert.Nil(t, rule.messagePattern)
+	assert.Nil(t, rule.labelsPatterns)
+	assert.Nil(t, rule.annotationsPatterns)
 }

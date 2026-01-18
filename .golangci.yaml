@@ -1,7 +1,7 @@
 version: "2"
 
 run:
-  timeout: 5m
+  timeout: 10m
 
 linters:
   # Default set of linters.
@@ -128,3 +128,6 @@ linters:
       - linters:
           - gosec
         text: "G108: Profiling endpoint is automatically exposed on /debug/pprof"
+      - linters:
+          - staticcheck
+        text: "is deprecated: aws-sdk-go is deprecated"
