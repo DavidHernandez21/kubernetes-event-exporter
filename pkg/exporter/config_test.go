@@ -422,7 +422,7 @@ receivers:
 	assert.NotNil(t, cfg.Route.Match[0].kindPattern)
 
 	// Test nested route Drop rules
-	assert.NotNil(t, cfg.Route.Routes[0].Drop[0].aPIVersionPattern)
+	assert.NotNil(t, cfg.Route.Routes[0].Drop[0].apiVersionPattern)
 	assert.Equal(t, int32(6), cfg.Route.Routes[0].Drop[0].MinCount)
 
 	// Test nested route Match rules with labels and annotations

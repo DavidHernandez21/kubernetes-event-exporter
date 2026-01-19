@@ -174,7 +174,7 @@ func compilePatternMap(patterns map[string]string) (map[string]*regexp.Regexp, e
 // preCompilePatternsHelper precompiles regex patterns for a given rule
 func (c *Config) preCompilePatternsHelper(rule *Rule) error {
 	var err error
-	rule.aPIVersionPattern, err = compilePattern(rule.APIVersion)
+	rule.apiVersionPattern, err = compilePattern(rule.APIVersion)
 	if err != nil {
 		return err
 	}

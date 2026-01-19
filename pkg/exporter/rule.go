@@ -26,7 +26,7 @@ type Rule struct {
 	// Precompiled patterns. Populated when the rule is created.
 	labelsPatterns      map[string]*regexp.Regexp
 	annotationsPatterns map[string]*regexp.Regexp
-	aPIVersionPattern   *regexp.Regexp
+	apiVersionPattern   *regexp.Regexp
 	kindPattern         *regexp.Regexp
 	namespacePattern    *regexp.Regexp
 	reasonPattern       *regexp.Regexp
@@ -67,7 +67,7 @@ func (r *Rule) MatchesEvent(ev *kube.EnhancedEvent) bool {
 	// These matchers are just basic comparison matchers, if one of them fails, it means the event does not match the rule
 	matchers := []fieldMatcher{
 		{pattern: r.messagePattern, ruleName: r.Message, eventName: ev.Message},
-		{pattern: r.aPIVersionPattern, ruleName: r.APIVersion, eventName: ev.InvolvedObject.APIVersion},
+		{pattern: r.apiVersionPattern, ruleName: r.APIVersion, eventName: ev.InvolvedObject.APIVersion},
 		{pattern: r.kindPattern, ruleName: r.Kind, eventName: ev.InvolvedObject.Kind},
 		{pattern: r.namespacePattern, ruleName: r.Namespace, eventName: ev.Namespace},
 		{pattern: r.reasonPattern, ruleName: r.Reason, eventName: ev.Reason},
