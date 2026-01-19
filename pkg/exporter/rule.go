@@ -34,7 +34,6 @@ type Rule struct {
 	componentPattern    *regexp.Regexp
 	hostPattern         *regexp.Regexp
 	messagePattern      *regexp.Regexp
-	minCountPattern     *regexp.Regexp
 	receiverPattern     *regexp.Regexp
 
 	// Fields to match against
