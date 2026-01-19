@@ -128,3 +128,6 @@ linters:
       - linters:
           - gosec
         text: "G108: Profiling endpoint is automatically exposed on /debug/pprof"
+      - linters:
+          - staticcheck
+        text: "is deprecated: aws-sdk-go is deprecated"
