@@ -220,10 +220,12 @@ func Test_GHIssue51(t *testing.T) {
 	r.ProcessEvent(&ev1, &reg)
 	r.ProcessEvent(&ev2, &reg)
 
+	assert.True(t, reg.isEventRcvd("elastic", &ev1))
+	assert.False(t, reg.isEventRcvd("elastic", &ev2))
 }
 
 // mustCompileRule is a helper to compile rule patterns for tests
-func mustCompileRule(t *testing.T, rule Rule) Rule {
+func mustCompileRule(t testing.TB, rule Rule) Rule {
 	cfg := Config{Route: Route{Match: []Rule{rule}}}
 	if err := cfg.PreCompilePatterns(); err != nil {
 		t.Fatalf("failed to compile rule patterns: %v", err)
@@ -260,7 +262,7 @@ func BenchmarkMatchesEvent_WithPrecompile(b *testing.B) {
 	ev := kube.EnhancedEvent{}
 	ev.Namespace = "kube-system"
 
-	rule := mustCompileRule(&testing.T{}, Rule{
+	rule := mustCompileRule(b, Rule{
 		Namespace: "kube-.*",
 	})
 
