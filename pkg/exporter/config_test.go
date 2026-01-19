@@ -398,7 +398,7 @@ route:
             app: "critical-.*"
             env: "production"
           annotations:
-            monitor: "true"
+            monitor: "true|enabled|1"
 receivers:
   - name: stdout
     stdout: {}
@@ -445,6 +445,21 @@ receivers:
 
 	matched = cfg.Route.Match[0].kindPattern.MatchString("Service")
 	assert.False(t, matched)
+
+	matched = cfg.Route.Routes[0].Match[0].labelsPatterns["app"].MatchString("critical-service")
+	assert.True(t, matched)
+
+	matched = cfg.Route.Routes[0].Match[0].labelsPatterns["env"].MatchString("production")
+	assert.True(t, matched)
+
+	matched = cfg.Route.Routes[0].Match[0].annotationsPatterns["monitor"].MatchString("enabled")
+	assert.True(t, matched)
+
+	matched = cfg.Route.Routes[0].Match[0].annotationsPatterns["monitor"].MatchString("1")
+	assert.True(t, matched)
+
+	matched = cfg.Route.Routes[0].Match[0].namespacePattern.MatchString("pre-prod-namespace")
+	assert.True(t, matched)
 }
 
 func TestPreCompilePatterns_DeepNesting(t *testing.T) {
