@@ -2,6 +2,7 @@ package kube
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
 )
@@ -28,6 +29,7 @@ type eventWatcherRequired struct {
 	maxEventAgeSeconds int64
 	cacheSize          int
 	mappingCacheSize   int
+	cacheTTL           time.Duration
 	omitLookup         bool
 }
 
@@ -90,6 +92,17 @@ func WithMappingCacheSize(size int) EventWatcherOption {
 			return fmt.Errorf("WithMappingCacheSize: size must be positive")
 		}
 		o.mappingCacheSize = size
+		return nil
+	}
+}
+
+// WithCacheTTL sets the TTL for the object metadata cache
+func WithCacheTTL(ttl time.Duration) EventWatcherOption {
+	return func(o *eventWatcherConfig) error {
+		if ttl <= 0 {
+			return fmt.Errorf("WithCacheTTL: ttl must be positive")
+		}
+		o.cacheTTL = ttl
 		return nil
 	}
 }

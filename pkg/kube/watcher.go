@@ -18,13 +18,13 @@ import (
 
 var startUpTime = time.Now()
 
-type EventHandler func(event *EnhancedEvent)
+type eventHandler func(event *EnhancedEvent)
 
-type EventWatcher struct {
+type eventWatcher struct {
 	informer            cache.SharedInformer
-	objectMetadataCache ObjectMetadataProvider
+	objectMetadataCache objectMetadataProvider
 	stopper             chan struct{}
-	fn                  EventHandler
+	fn                  eventHandler
 	metricsStore        *metrics.Store
 	dynamicClient       *dynamic.DynamicClient
 	clientset           *kubernetes.Clientset
@@ -33,7 +33,7 @@ type EventWatcher struct {
 	omitLookup          bool
 }
 
-func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts ...EventWatcherOption) (*EventWatcher, error) {
+func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts ...EventWatcherOption) (*eventWatcher, error) {
 	var o eventWatcherConfig
 	o.eventWatcherRequired = *required
 
@@ -47,10 +47,10 @@ func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts .
 	factory := informers.NewSharedInformerFactoryWithOptions(clientset, 0, informers.WithNamespace(o.namespace))
 	informer := factory.Core().V1().Events().Informer()
 
-	watcher := &EventWatcher{
+	watcher := &eventWatcher{
 		informer:            informer,
 		stopper:             make(chan struct{}),
-		objectMetadataCache: NewObjectMetadataProvider(o.cacheSize, o.mappingCacheSize),
+		objectMetadataCache: newObjectMetadataProviderWithTTL(o.cacheSize, o.mappingCacheSize, o.cacheTTL),
 		omitLookup:          o.omitLookup,
 		fn:                  o.onEvent,
 		maxEventAgeSeconds:  time.Second * time.Duration(o.maxEventAgeSeconds),
@@ -74,18 +74,18 @@ func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts .
 }
 
 //nolint:errcheck
-func (e *EventWatcher) OnAdd(obj any, isInInitialList bool) {
+func (e *eventWatcher) OnAdd(obj any, isInInitialList bool) {
 	// ignore type assertion failure
 	event := obj.(*corev1.Event)
 	e.onEvent(event)
 }
 
-func (e *EventWatcher) OnUpdate(oldObj, newObj any) {
+func (e *eventWatcher) OnUpdate(oldObj, newObj any) {
 	// Ignore updates
 }
 
 // Ignore events older than the maxEventAgeSeconds
-func (e *EventWatcher) isEventDiscarded(event *corev1.Event) bool {
+func (e *eventWatcher) isEventDiscarded(event *corev1.Event) bool {
 	timestamp := event.LastTimestamp.Time
 	if timestamp.IsZero() {
 		timestamp = event.EventTime.Time
@@ -107,7 +107,7 @@ func (e *EventWatcher) isEventDiscarded(event *corev1.Event) bool {
 	return false
 }
 
-func (e *EventWatcher) onEvent(event *corev1.Event) {
+func (e *eventWatcher) onEvent(event *corev1.Event) {
 	if e.isEventDiscarded(event) {
 		return
 	}
@@ -129,7 +129,7 @@ func (e *EventWatcher) onEvent(event *corev1.Event) {
 	if e.omitLookup {
 		ev.InvolvedObject.ObjectReference = *event.InvolvedObject.DeepCopy()
 	} else {
-		objectMetadata, err := e.objectMetadataCache.GetObjectMetadata(&event.InvolvedObject, e.clientset, e.dynamicClient, e.metricsStore)
+		om, err := e.objectMetadataCache.getObjectMetadata(&event.InvolvedObject, e.clientset, e.dynamicClient, e.metricsStore)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				ev.InvolvedObject.Deleted = true
@@ -139,22 +139,22 @@ func (e *EventWatcher) onEvent(event *corev1.Event) {
 			}
 			ev.InvolvedObject.ObjectReference = *event.InvolvedObject.DeepCopy()
 		} else {
-			ev.InvolvedObject.Labels = objectMetadata.Labels
-			ev.InvolvedObject.Annotations = objectMetadata.Annotations
-			ev.InvolvedObject.OwnerReferences = objectMetadata.OwnerReferences
+			ev.InvolvedObject.Labels = om.Labels
+			ev.InvolvedObject.Annotations = om.Annotations
+			ev.InvolvedObject.OwnerReferences = om.OwnerReferences
 			ev.InvolvedObject.ObjectReference = *event.InvolvedObject.DeepCopy()
-			ev.InvolvedObject.Deleted = objectMetadata.Deleted
+			ev.InvolvedObject.Deleted = om.Deleted
 		}
 	}
 
 	e.fn(ev)
 }
 
-func (e *EventWatcher) OnDelete(obj any) {
+func (e *eventWatcher) OnDelete(obj any) {
 	// Ignore deletes
 }
 
-func (e *EventWatcher) Start() {
+func (e *eventWatcher) Start() {
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
@@ -162,11 +162,11 @@ func (e *EventWatcher) Start() {
 	}()
 }
 
-func (e *EventWatcher) Stop() {
+func (e *eventWatcher) Stop() {
 	close(e.stopper)
 	e.wg.Wait()
 }
 
-func (e *EventWatcher) setStartUpTime(t time.Time) {
+func (e *eventWatcher) setStartUpTime(t time.Time) {
 	startUpTime = t
 }

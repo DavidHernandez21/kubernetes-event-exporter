@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog/log"
@@ -159,6 +160,34 @@ func TestSetDefaults(t *testing.T) {
 	require.Equal(t, DefaultCacheSize, config.CacheSize)
 	require.Equal(t, rest.DefaultQPS, config.KubeQPS)
 	require.Equal(t, rest.DefaultBurst, config.KubeBurst)
+	require.Equal(t, "12h0m0s", config.CacheTTL)
+	require.NoError(t, config.Validate())
+	require.Equal(t, defaultCacheTTL, config.CacheTTLDuration())
+}
+
+func TestValidate_CacheTTL_InvalidNegative(t *testing.T) {
+	config := Config{CacheTTL: "-1h"}
+	err := config.Validate()
+	assert.Error(t, err)
+}
+
+func TestValidate_CacheTTL_TooLarge(t *testing.T) {
+	config := Config{CacheTTL: "720h1m"} // just over 30d
+	err := config.Validate()
+	assert.Error(t, err)
+}
+
+func TestValidate_CacheTTL_InvalidFormat(t *testing.T) {
+	config := Config{CacheTTL: "not-a-duration"}
+	err := config.Validate()
+	assert.Error(t, err)
+}
+
+func TestValidate_CacheTTL_Valid(t *testing.T) {
+	config := Config{CacheTTL: "1h"}
+	err := config.Validate()
+	assert.NoError(t, err)
+	assert.Equal(t, time.Hour, config.CacheTTLDuration())
 }
 
 func TestValidate_FailsOnInvalidRegexPattern(t *testing.T) {
