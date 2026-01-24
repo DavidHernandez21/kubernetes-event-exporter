@@ -56,8 +56,7 @@ type Config struct {
 	MappingCacheSize int `yaml:"mappingCacheSize,omitempty"`
 
 	// cacheTTLDuration is the parsed duration of CacheTTL.
-	// It must not exceed maxCacheTTL
-
+	// It must not exceed maxCacheTTL.
 	// It is not exposed in the YAML config, but set after parsing CacheTTL string
 	cacheTTLDuration time.Duration `yaml:"-"`
 
