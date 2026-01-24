@@ -67,7 +67,7 @@ func newObjectMetadataProviderWithTTL(size, mappingCacheSize int, ttl time.Durat
 func (o *objectMetadataCache) getObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (objectMetadata, error) {
 	cacheKey := string(reference.UID)
 	if val, ok := o.cache.Get(cacheKey); ok {
-		if time.Since(val.fetchedAt) < o.ttl || o.ttl <= 0 {
+		if time.Since(val.fetchedAt) < o.ttl {
 			metricsStore.KubeApiReadCacheHits.Inc()
 			return val.metadata, nil
 		}
