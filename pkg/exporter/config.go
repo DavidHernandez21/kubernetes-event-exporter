@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 	"github.com/resmoio/kubernetes-event-exporter/pkg/sinks"
@@ -16,28 +17,55 @@ import (
 const (
 	DefaultCacheSize        = 1024
 	DefaultMappingCacheSize = DefaultCacheSize / 4
+	defaultCacheTTL         = 12 * time.Hour
+	maxCacheTTL             = 30 * 24 * time.Hour
 )
 
 // Config allows configuration
 type Config struct {
-	LeaderElection kube.LeaderElectionConfig `yaml:"leaderElection"`
 	// Route is the top route that the events will match
 	// TODO: There is currently a tight coupling with route and config, but not with receiver config and sink so
 	// TODO: I am not sure what to do here.
-	LogLevel           string                 `yaml:"logLevel"`
-	LogFormat          string                 `yaml:"logFormat"`
-	ClusterName        string                 `yaml:"clusterName,omitempty"`
-	Namespace          string                 `yaml:"namespace"`
-	MetricsNamePrefix  string                 `yaml:"metricsNamePrefix,omitempty"`
-	Route              Route                  `yaml:"route"`
-	Receivers          []sinks.ReceiverConfig `yaml:"receivers"`
-	ThrottlePeriod     int64                  `yaml:"throttlePeriod"`
-	MaxEventAgeSeconds int64                  `yaml:"maxEventAgeSeconds"`
-	KubeBurst          int                    `yaml:"kubeBurst,omitempty"`
-	CacheSize          int                    `yaml:"cacheSize,omitempty"`
-	MappingCacheSize   int                    `yaml:"mappingCacheSize,omitempty"`
-	KubeQPS            float32                `yaml:"kubeQPS,omitempty"`
-	OmitLookup         bool                   `yaml:"omitLookup,omitempty"`
+	LogLevel          string `yaml:"logLevel"`
+	LogFormat         string `yaml:"logFormat"`
+	ClusterName       string `yaml:"clusterName,omitempty"`
+	Namespace         string `yaml:"namespace"`
+	MetricsNamePrefix string `yaml:"metricsNamePrefix,omitempty"`
+
+	// CacheTTL is the duration for which the metadata (Labels, Annotations, OwnerReferences)
+	// of the involved object in the event is cached
+	CacheTTL       string                    `yaml:"cacheTTL,omitempty"`
+	Route          Route                     `yaml:"route"`
+	LeaderElection kube.LeaderElectionConfig `yaml:"leaderElection"`
+	Receivers      []sinks.ReceiverConfig    `yaml:"receivers"`
+	ThrottlePeriod int64                     `yaml:"throttlePeriod"`
+
+	// MaxEventAgeSeconds is the maximum age of events to be processed
+	// It is compared against the event's LastTimestamp or
+	// EventTime if the former is not set
+	MaxEventAgeSeconds int64 `yaml:"maxEventAgeSeconds"`
+
+	// KubeBurst number of requests the client can make in excess of the QPS rate,
+	KubeBurst int `yaml:"kubeBurst,omitempty"`
+
+	// CacheSize is the size of the cache for storing metadata (Labels, Annotations, OwnerReferences)
+	// of involved objects
+	CacheSize int `yaml:"cacheSize,omitempty"`
+
+	// MappingCacheSize is the size of the cache for storing REST mappings
+	MappingCacheSize int `yaml:"mappingCacheSize,omitempty"`
+
+	// cacheTTLDuration is the parsed duration of CacheTTL.
+	// It must not exceed maxCacheTTL.
+	// It is not exposed in the YAML config, but set after parsing CacheTTL string
+	cacheTTLDuration time.Duration `yaml:"-"`
+
+	// KubeQPS is the maximum QPS to the Kubernetes API server
+	KubeQPS float32 `yaml:"kubeQPS,omitempty"`
+
+	// OmitLookup indicates whether to omit involved
+	// object metadata (Labels, Annotations, OwnerReferences) lookups
+	OmitLookup bool `yaml:"omitLookup,omitempty"`
 }
 
 func (c *Config) SetDefaults() {
@@ -73,6 +101,11 @@ func (c *Config) SetDefaults() {
 		c.KubeQPS = rest.DefaultQPS
 		log.Debug().Msg(fmt.Sprintf("setting config.kubeQPS=%.2f (default)", rest.DefaultQPS))
 	}
+
+	if c.CacheTTL == "" {
+		c.CacheTTL = defaultCacheTTL.String()
+		log.Debug().Str("cacheTTL", c.CacheTTL).Msg("setting config.cacheTTL to default (12h)")
+	}
 }
 
 func (c *Config) Validate() error {
@@ -97,6 +130,9 @@ func (c *Config) Validate() error {
 
 func (c *Config) validateDefaults() error {
 	if err := c.validateMaxEventAgeSeconds(); err != nil {
+		return err
+	}
+	if err := c.validateCacheTTL(); err != nil {
 		return err
 	}
 	return nil
@@ -144,6 +180,35 @@ func (c *Config) validateMetricsNamePrefix() error {
 		log.Warn().Msg("metrics name prefix is empty, setting config.metricsNamePrefix='event_exporter_' is recommended")
 	}
 	return nil
+}
+
+func (c *Config) validateCacheTTL() error {
+	if c.CacheTTL == "" {
+		c.CacheTTL = defaultCacheTTL.String()
+		log.Info().Str("cacheTTL", c.CacheTTL).Msg("setting config.cacheTTL to default")
+	}
+
+	parsed, err := time.ParseDuration(c.CacheTTL)
+	if err != nil {
+		log.Error().Str("cacheTTL", c.CacheTTL).Err(err).Msg("invalid cacheTTL duration")
+		return fmt.Errorf("validateCacheTTL failed parsing %q: %w", c.CacheTTL, err)
+	}
+	if parsed <= 0 {
+		log.Error().Str("cacheTTL", c.CacheTTL).Msg("cacheTTL must be positive")
+		return errors.New("validateCacheTTL failed: cacheTTL must be positive")
+	}
+	if parsed > maxCacheTTL {
+		log.Error().Dur("cacheTTL", parsed).Msg("cacheTTL too large; max 30 days")
+		return errors.New("validateCacheTTL failed: too large. cacheTTL must not exceed 30 days")
+	}
+
+	c.cacheTTLDuration = parsed
+	log.Debug().Dur("cacheTTL", parsed).Msg("config.cacheTTL")
+	return nil
+}
+
+func (c *Config) CacheTTLDuration() time.Duration {
+	return c.cacheTTLDuration
 }
 
 // compilePattern compiles a regex pattern if it's not empty, returns nil otherwise

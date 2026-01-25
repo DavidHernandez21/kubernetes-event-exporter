@@ -96,6 +96,12 @@ func TestWatcherOptions_InvalidValues(t *testing.T) {
 				WithMappingCacheSize(0),
 			},
 		},
+		{
+			name: "CacheTTL_zero",
+			opts: []EventWatcherOption{
+				WithCacheTTL(0),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -117,6 +123,7 @@ func TestWatcherOptions_HappyPath(t *testing.T) {
 		WithMaxEventAgeSeconds(120),
 		WithCacheSize(256),
 		WithMappingCacheSize(128),
+		WithCacheTTL(5 * time.Minute),
 		WithNamespace("default"),
 		WithOmitLookup(false),
 	}
@@ -137,6 +144,9 @@ func TestWatcherOptions_HappyPath(t *testing.T) {
 	}
 	if ewReq.mappingCacheSize != 128 {
 		t.Fatalf("MappingCacheSize mismatch: got %d", ewReq.mappingCacheSize)
+	}
+	if ewReq.cacheTTL != 5*time.Minute {
+		t.Fatalf("CacheTTL mismatch: got %s", ewReq.cacheTTL)
 	}
 	if ewReq.namespace != "default" {
 		t.Fatalf("Namespace mismatch: got %s", ewReq.namespace)

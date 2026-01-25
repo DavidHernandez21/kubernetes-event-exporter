@@ -21,18 +21,18 @@ import (
 )
 
 type mockObjectMetadataProvider struct {
-	cache        *lru.TwoQueueCache[string, ObjectMetadata]
+	cache        *lru.TwoQueueCache[string, objectMetadata]
 	mappingCache *lru.TwoQueueCache[string, schema.GroupVersionResource]
 	objDeleted   bool
 }
 
-func newMockObjectMetadataProvider() ObjectMetadataProvider {
-	cache, err := lru.New2Q[string, ObjectMetadata](1024)
+func newMockObjectMetadataProvider() objectMetadataProvider {
+	cache, err := lru.New2Q[string, objectMetadata](1024)
 	if err != nil {
 		panic("cannot init cache: " + err.Error())
 	}
 
-	cache.Add("test", ObjectMetadata{
+	cache.Add("test", objectMetadata{
 		Annotations: map[string]string{"test": "test"},
 		Labels:      map[string]string{"test": "test"},
 		OwnerReferences: []metav1.OwnerReference{
@@ -50,7 +50,7 @@ func newMockObjectMetadataProvider() ObjectMetadataProvider {
 		panic("cannot init mapping cache: " + err.Error())
 	}
 
-	var o ObjectMetadataProvider = &mockObjectMetadataProvider{
+	var o objectMetadataProvider = &mockObjectMetadataProvider{
 		cache:        cache,
 		mappingCache: mappingCache,
 		objDeleted:   false,
@@ -59,19 +59,19 @@ func newMockObjectMetadataProvider() ObjectMetadataProvider {
 	return o
 }
 
-func (o *mockObjectMetadataProvider) GetObjectMetadata(reference *corev1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
+func (o *mockObjectMetadataProvider) getObjectMetadata(reference *corev1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (objectMetadata, error) {
 	if o.objDeleted {
-		return ObjectMetadata{}, errors.NewNotFound(schema.GroupResource{}, "")
+		return objectMetadata{}, errors.NewNotFound(schema.GroupResource{}, "")
 	}
 
 	val, _ := o.cache.Get("test")
 	return val, nil
 }
 
-var _ ObjectMetadataProvider = &mockObjectMetadataProvider{}
+var _ objectMetadataProvider = &mockObjectMetadataProvider{}
 
-func newMockEventWatcher(MaxEventAgeSeconds int64, metricsStore *metrics.Store) *EventWatcher {
-	watcher := &EventWatcher{
+func newMockEventWatcher(MaxEventAgeSeconds int64, metricsStore *metrics.Store) *eventWatcher {
+	watcher := &eventWatcher{
 		objectMetadataCache: newMockObjectMetadataProvider(),
 		maxEventAgeSeconds:  time.Second * time.Duration(MaxEventAgeSeconds),
 		fn:                  func(event *EnhancedEvent) {},

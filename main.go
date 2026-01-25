@@ -132,6 +132,7 @@ func main() {
 	eventWatcherRequired, err := kube.NewEventWatcherRequired(
 		kube.WithCacheSize(cfg.CacheSize),
 		kube.WithMappingCacheSize(cfg.MappingCacheSize),
+		kube.WithCacheTTL(cfg.CacheTTLDuration()),
 		kube.WithMaxEventAgeSeconds(cfg.MaxEventAgeSeconds),
 		kube.WithMetricsStore(metricsStore),
 		kube.WithOnEventHandler(onEvent),

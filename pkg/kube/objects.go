@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"strings"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
@@ -15,26 +16,36 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-type ObjectMetadataProvider interface {
-	GetObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error)
+type objectMetadataProvider interface {
+	getObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (objectMetadata, error)
 }
 
-type ObjectMetadataCache struct {
-	cache        *lru.TwoQueueCache[string, ObjectMetadata]
+type objectMetadataCache struct {
+	cache        *lru.TwoQueueCache[string, cachedMetadata]
 	mappingCache *lru.TwoQueueCache[string, schema.GroupVersionResource]
+	ttl          time.Duration
 }
 
-var _ ObjectMetadataProvider = &ObjectMetadataCache{}
+var _ objectMetadataProvider = &objectMetadataCache{}
 
-type ObjectMetadata struct {
+type cachedMetadata struct {
+	fetchedAt time.Time
+	metadata  objectMetadata
+}
+
+type objectMetadata struct {
 	Annotations     map[string]string
 	Labels          map[string]string
 	OwnerReferences []metav1.OwnerReference
 	Deleted         bool
 }
 
-func NewObjectMetadataProvider(size, mappingCacheSize int) ObjectMetadataProvider {
-	cache, err := lru.New2Q[string, ObjectMetadata](size)
+func newObjectMetadataProviderWithTTL(size, mappingCacheSize int, ttl time.Duration) objectMetadataProvider {
+	if ttl <= 0 {
+		panic("cannot init cache: CacheTTL must be positive")
+	}
+
+	cache, err := lru.New2Q[string, cachedMetadata](size)
 	if err != nil {
 		panic("cannot init cache: " + err.Error())
 	}
@@ -44,21 +55,23 @@ func NewObjectMetadataProvider(size, mappingCacheSize int) ObjectMetadataProvide
 		panic("cannot init mapping cache: " + err.Error())
 	}
 
-	var o ObjectMetadataProvider = &ObjectMetadataCache{
+	var o objectMetadataProvider = &objectMetadataCache{
 		cache:        cache,
 		mappingCache: mappingCache,
+		ttl:          ttl,
 	}
 
 	return o
 }
 
-func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (ObjectMetadata, error) {
-	// ResourceVersion changes when the object is updated.
-	// We use "UID/ResourceVersion" as cache key so that if the object is updated we get the new metadata.
-	cacheKey := string(reference.UID) + "/" + reference.ResourceVersion
+func (o *objectMetadataCache) getObjectMetadata(reference *v1.ObjectReference, clientset kubernetes.Interface, dynClient dynamic.Interface, metricsStore *metrics.Store) (objectMetadata, error) {
+	cacheKey := string(reference.UID)
 	if val, ok := o.cache.Get(cacheKey); ok {
-		metricsStore.KubeApiReadCacheHits.Inc()
-		return val, nil
+		if time.Since(val.fetchedAt) < o.ttl {
+			metricsStore.KubeApiReadCacheHits.Inc()
+			return val.metadata, nil
+		}
+		o.cache.Remove(cacheKey)
 	}
 
 	var group, version string
@@ -82,13 +95,13 @@ func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, c
 
 		groupResources, err := restmapper.GetAPIGroupResources(clientset.Discovery())
 		if err != nil {
-			return ObjectMetadata{}, err
+			return objectMetadata{}, err
 		}
 		rm := restmapper.NewDiscoveryRESTMapper(groupResources)
 		gk := schema.GroupKind{Group: group, Kind: reference.Kind}
 		mapping, err := rm.RESTMapping(gk, version)
 		if err != nil {
-			return ObjectMetadata{}, err
+			return objectMetadata{}, err
 		}
 
 		metricsStore.KubeApiMappingReadRequests.Inc()
@@ -105,19 +118,19 @@ func (o *ObjectMetadataCache) GetObjectMetadata(reference *v1.ObjectReference, c
 	metricsStore.KubeApiReadRequests.Inc()
 
 	if err != nil {
-		return ObjectMetadata{}, err
+		return objectMetadata{}, err
 	}
 
-	objectMetadata := ObjectMetadata{
+	om := objectMetadata{
 		OwnerReferences: item.GetOwnerReferences(),
 		Labels:          item.GetLabels(),
 		Annotations:     item.GetAnnotations(),
 	}
 
 	if item.GetDeletionTimestamp() != nil {
-		objectMetadata.Deleted = true
+		om.Deleted = true
 	}
 
-	o.cache.Add(cacheKey, objectMetadata)
-	return objectMetadata, nil
+	o.cache.Add(cacheKey, cachedMetadata{metadata: om, fetchedAt: time.Now()})
+	return om, nil
 }

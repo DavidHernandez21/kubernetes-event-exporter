@@ -2,7 +2,9 @@ package kube
 
 import (
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,18 +15,16 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	dynfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
 )
 
-func TestGetObjectMetadata_MappingCacheMissThenHit_WithFakeClients(t *testing.T) {
-	metricsStore := metrics.NewMetricsStore("test_")
-	defer metrics.DestroyMetricsStore(metricsStore)
+func newMetadataTestEnv(t *testing.T, ttl time.Duration) (*objectMetadataCache, *fake.Clientset, *dynfake.FakeDynamicClient, *corev1.ObjectReference) {
+	t.Helper()
 
-	// provider with empty caches
-	provider := NewObjectMetadataProvider(1024, 256).(*ObjectMetadataCache)
+	provider := newObjectMetadataProviderWithTTL(1024, 256, ttl).(*objectMetadataCache)
 
-	// Prepare fake discovery: declare apps/v1 deployments
 	apiRes := &metav1.APIResourceList{
 		GroupVersion: "apps/v1",
 		APIResources: []metav1.APIResource{
@@ -36,32 +36,30 @@ func TestGetObjectMetadata_MappingCacheMissThenHit_WithFakeClients(t *testing.T)
 			},
 		},
 	}
-	// Fake typed clientset (we only need discovery interface)
+
 	cs := fake.NewClientset()
-	// underlying discovery is *fakediscovery.FakeDiscovery
 	if fd, ok := cs.Discovery().(*fakediscovery.FakeDiscovery); ok {
 		fd.Resources = []*metav1.APIResourceList{apiRes}
 	} else {
 		t.Fatalf("expected fake discovery type")
 	}
 
-	// Create an unstructured deployment that dynamic fake will return
 	u := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-deploy",
 				"namespace": "default",
 				"uid":       "test-uid",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"test": "test",
 				},
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					"test": "test",
 				},
-				"ownerReferences": []interface{}{
-					map[string]interface{}{
+				"ownerReferences": []any{
+					map[string]any{
 						"apiVersion": "testAPI",
 						"kind":       "testKind",
 						"name":       "testOwner",
@@ -72,10 +70,8 @@ func TestGetObjectMetadata_MappingCacheMissThenHit_WithFakeClients(t *testing.T)
 		},
 	}
 
-	// Fake dynamic client seeded with the unstructured object
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme(), u)
 
-	// Build an ObjectReference that will trigger mapping resolution
 	ref := &corev1.ObjectReference{
 		UID:             "test-uid",
 		ResourceVersion: "1",
@@ -85,8 +81,17 @@ func TestGetObjectMetadata_MappingCacheMissThenHit_WithFakeClients(t *testing.T)
 		Namespace:       "default",
 	}
 
+	return provider, cs, dyn, ref
+}
+
+func TestGetObjectMetadata_MappingCacheMissThenHit_WithFakeClients(t *testing.T) {
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+
+	provider, cs, dyn, ref := newMetadataTestEnv(t, 12*time.Hour)
+
 	// First call: mapping miss -> provider should call discovery+RESTMapping and then dyn Get
-	meta, err := provider.GetObjectMetadata(ref, cs, dyn, metricsStore)
+	meta, err := provider.getObjectMetadata(ref, cs, dyn, metricsStore)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"test": "test"}, meta.Labels)
 	// mapping should have been resolved and cached: assert mappingCache contains the mappingKey
@@ -97,7 +102,52 @@ func TestGetObjectMetadata_MappingCacheMissThenHit_WithFakeClients(t *testing.T)
 	assert.Equal(t, "deployments", val.Resource)
 
 	// Second call: mapping hit path (cache should contain the mapping), provider should still return metadata
-	meta2, err := provider.GetObjectMetadata(ref, cs, dyn, metricsStore)
+	meta2, err := provider.getObjectMetadata(ref, cs, dyn, metricsStore)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"test": "test"}, meta2.Labels)
+}
+
+func TestGetObjectMetadata_CacheKeyUsesUIDOnly(t *testing.T) {
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+
+	provider, cs, dyn, ref := newMetadataTestEnv(t, 10*time.Second)
+	var getCalls int32
+
+	dyn.Fake.PrependReactor("get", "deployments", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		atomic.AddInt32(&getCalls, 1)
+		return false, nil, nil
+	})
+
+	_, err := provider.getObjectMetadata(ref, cs, dyn, metricsStore)
+	require.NoError(t, err)
+
+	ref.ResourceVersion = "2"
+	_, err = provider.getObjectMetadata(ref, cs, dyn, metricsStore)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&getCalls), "expected cache hit when only ResourceVersion changed")
+}
+
+func TestGetObjectMetadata_TTLExpiryTriggersRefresh(t *testing.T) {
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+
+	provider, cs, dyn, ref := newMetadataTestEnv(t, 20*time.Millisecond)
+	var getCalls int32
+
+	dyn.Fake.PrependReactor("get", "deployments", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		atomic.AddInt32(&getCalls, 1)
+		return false, nil, nil
+	})
+
+	_, err := provider.getObjectMetadata(ref, cs, dyn, metricsStore)
+	require.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	_, err = provider.getObjectMetadata(ref, cs, dyn, metricsStore)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), atomic.LoadInt32(&getCalls), "expected cache refresh after TTL expiry")
 }

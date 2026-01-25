@@ -3,6 +3,9 @@ logFormat: json
 maxEventAgeSeconds: 10
 kubeQPS: 60
 kubeBurst: 60
+cacheTTL: 12h # TTL for object metadata cache
+cacheSize: 1024 # Max number of entries in object metadata cache
+mappingCacheSize: 256 # Max number of entries in REST mapping cache
 # namespace: my-namespace-only # Omitting it defaults to all namespaces.
 route:
   # Main route
