@@ -115,6 +115,10 @@ linters:
           - gocritic
         text: "whyNoLint:"
       - linters:
+          - gocritic
+        text: "ifElseChain:"
+        path: pkg/kube/watcher.go
+      - linters:
           - govet
         text: "shadow: declaration of \"err\""
       - linters:
