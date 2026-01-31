@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 )
 
 func getMetricsStore(t *testing.T) *metrics.Store {

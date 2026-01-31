@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
 	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

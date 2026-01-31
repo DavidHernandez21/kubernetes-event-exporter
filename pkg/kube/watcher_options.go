@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 )
 
 // EventWatcherOption defines a functional option for configuring the EventWatcher
