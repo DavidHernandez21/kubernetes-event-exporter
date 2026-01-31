@@ -9,8 +9,8 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
-  build:
-    name: Build
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/cache@v5
