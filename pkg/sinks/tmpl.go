@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 )
 
 func GetString(event *kube.EnhancedEvent, text string) (string, error) {

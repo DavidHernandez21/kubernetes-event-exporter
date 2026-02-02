@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 )
 
 // matchString is a method to clean the code. Error handling is omitted here because these

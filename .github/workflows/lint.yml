@@ -1,16 +1,26 @@
-name: Test
+name: Lint
 on:
   push:
     branches:
       - main
-      - master
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+      - ".golangci.yaml"
   pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+      - ".golangci.yaml"
 permissions:
   contents: read
   pull-requests: read
 jobs:
-  build:
-    name: Build
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/cache@v5

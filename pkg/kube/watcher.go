@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -59,6 +59,7 @@ func NewEventWatcher(config *rest.Config, required *eventWatcherRequired, opts .
 		clientset:           clientset,
 	}
 
+	// Register watcher as ResourceEventHandler to process adds, updates, deletes
 	_, err := informer.AddEventHandler(watcher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add event handler: %w", err)
@@ -80,26 +81,35 @@ func (e *eventWatcher) OnAdd(obj any, isInInitialList bool) {
 	e.onEvent(event)
 }
 
+// OnUpdate is called when an existing Event is modified
+//
+//nolint:errcheck
 func (e *eventWatcher) OnUpdate(oldObj, newObj any) {
-	// Ignore updates
+	event := newObj.(*corev1.Event)
+	e.onEvent(event)
 }
 
 // Ignore events older than the maxEventAgeSeconds
 func (e *eventWatcher) isEventDiscarded(event *corev1.Event) bool {
-	timestamp := event.LastTimestamp.Time
-	if timestamp.IsZero() {
+	// Use the most recent timestamp: series, then LastTimestamp, then EventTime
+	var timestamp time.Time
+	if event.Series != nil && !event.Series.LastObservedTime.Time.IsZero() {
+		timestamp = event.Series.LastObservedTime.Time
+	} else if !event.LastTimestamp.Time.IsZero() {
+		timestamp = event.LastTimestamp.Time
+	} else {
 		timestamp = event.EventTime.Time
 	}
 	eventAge := time.Since(timestamp)
 	if eventAge > e.maxEventAgeSeconds {
 		// Log discarded events if they were created after the watcher started
-		// (to suppres warnings from initial synchrnization)
+		// (to suppress warnings from initial synchronization)
 		if timestamp.After(startUpTime) {
 			log.Warn().
 				Str("event age", eventAge.String()).
 				Str("event namespace", event.Namespace).
 				Str("event name", event.Name).
-				Msg("Event discarded as being older then maxEventAgeSeconds")
+				Msg("Event discarded as being older than maxEventAgeSeconds")
 			e.metricsStore.EventsDiscarded.Inc()
 		}
 		return true

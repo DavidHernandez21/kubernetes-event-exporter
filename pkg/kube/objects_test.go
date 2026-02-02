@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
-	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 )
 
 func newMetadataTestEnv(t *testing.T, ttl time.Duration) (*objectMetadataCache, *fake.Clientset, *dynfake.FakeDynamicClient, *corev1.ObjectReference) {

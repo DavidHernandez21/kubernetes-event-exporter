@@ -3,11 +3,11 @@ package sinks
 import (
 	"context"
 	"encoding/json"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eventbridge"
-	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 	"github.com/rs/zerolog/log"
 	"time"
 )

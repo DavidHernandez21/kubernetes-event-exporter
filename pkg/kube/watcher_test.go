@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/resmoio/kubernetes-event-exporter/pkg/metrics"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,7 +97,7 @@ func TestEventWatcher_EventAge_whenEventCreatedBeforeStartup(t *testing.T) {
 
 	// event is 3m before stratup time -> expect silently dropped
 	assert.True(t, ew.isEventDiscarded(&event1))
-	assert.NotContains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event1)
 	assert.NotContains(t, output.String(), "Received event")
 	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
@@ -107,7 +107,7 @@ func TestEventWatcher_EventAge_whenEventCreatedBeforeStartup(t *testing.T) {
 	}
 
 	assert.True(t, ew.isEventDiscarded(&event2))
-	assert.NotContains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event2)
 	assert.NotContains(t, output.String(), "Received event")
 	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
@@ -119,7 +119,7 @@ func TestEventWatcher_EventAge_whenEventCreatedBeforeStartup(t *testing.T) {
 	}
 
 	assert.True(t, ew.isEventDiscarded(&event3))
-	assert.NotContains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event3)
 	assert.NotContains(t, output.String(), "Received event")
 	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
@@ -147,7 +147,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndBeforeMaxAge(t *te
 	}
 
 	assert.False(t, ew.isEventDiscarded(&event1))
-	assert.NotContains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event1)
 	assert.Contains(t, output.String(), "test-1")
 	assert.Contains(t, output.String(), "Received event")
@@ -163,7 +163,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndBeforeMaxAge(t *te
 	}
 
 	assert.False(t, ew.isEventDiscarded(&event2))
-	assert.NotContains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event2)
 	assert.Contains(t, output.String(), "test-2")
 	assert.Contains(t, output.String(), "Received event")
@@ -180,7 +180,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndBeforeMaxAge(t *te
 	}
 
 	assert.False(t, ew.isEventDiscarded(&event3))
-	assert.NotContains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event3)
 	assert.Contains(t, output.String(), "test-3")
 	assert.Contains(t, output.String(), "Received event")
@@ -206,7 +206,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndAfterMaxAge(t *tes
 	}
 	assert.True(t, ew.isEventDiscarded(&event1))
 	assert.Contains(t, output.String(), "event1")
-	assert.Contains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.Contains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event1)
 	assert.NotContains(t, output.String(), "Received event")
 	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
@@ -219,7 +219,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndAfterMaxAge(t *tes
 
 	assert.True(t, ew.isEventDiscarded(&event2))
 	assert.Contains(t, output.String(), "event2")
-	assert.Contains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.Contains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event2)
 	assert.NotContains(t, output.String(), "Received event")
 	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
@@ -233,12 +233,91 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndAfterMaxAge(t *tes
 
 	assert.True(t, ew.isEventDiscarded(&event3))
 	assert.Contains(t, output.String(), "event3")
-	assert.Contains(t, output.String(), "Event discarded as being older then maxEventAgeSeconds")
+	assert.Contains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
 	ew.onEvent(&event3)
 	assert.NotContains(t, output.String(), "Received event")
 	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
 
 	metrics.DestroyMetricsStore(metricsStore)
+}
+
+func TestEventWatcher_EventAge_whenSeriesLastObservedTimeWithinMaxAge(t *testing.T) {
+	var MaxEventAgeSeconds int64 = 300
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+	output := &bytes.Buffer{}
+	log.Logger = log.Logger.Output(output)
+
+	ew := newMockEventWatcher(MaxEventAgeSeconds, metricsStore)
+	startup := time.Now().Add(-10 * time.Minute)
+	ew.setStartUpTime(startup)
+
+	event := corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{Name: "event-series-recent"},
+		Series: &corev1.EventSeries{
+			LastObservedTime: metav1.MicroTime{Time: startup.Add(8 * time.Minute)},
+		},
+		// Set an alternate timestamp to confirm Series takes precedence.
+		LastTimestamp: metav1.Time{Time: startup.Add(3 * time.Minute)},
+	}
+
+	assert.False(t, ew.isEventDiscarded(&event))
+	ew.onEvent(&event)
+	assert.Contains(t, output.String(), "Received event")
+	assert.Equal(t, float64(1), testutil.ToFloat64(metricsStore.EventsProcessed))
+}
+
+func TestEventWatcher_EventAge_whenSeriesLastObservedTimeAfterMaxAge(t *testing.T) {
+	var MaxEventAgeSeconds int64 = 300
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+	output := &bytes.Buffer{}
+	log.Logger = log.Logger.Output(output)
+
+	ew := newMockEventWatcher(MaxEventAgeSeconds, metricsStore)
+	startup := time.Now().Add(-10 * time.Minute)
+	ew.setStartUpTime(startup)
+
+	event := corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{Name: "event-series-old"},
+		Series: &corev1.EventSeries{
+			LastObservedTime: metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
+		},
+		// Set an alternate timestamp to confirm Series takes precedence.
+		EventTime: metav1.MicroTime{Time: startup.Add(8 * time.Minute)},
+	}
+
+	ew.onEvent(&event)
+	assert.Contains(t, output.String(), "event-series-old")
+	assert.Contains(t, output.String(), "Event discarded as being older than maxEventAgeSeconds")
+	assert.NotContains(t, output.String(), "Received event")
+	assert.Equal(t, float64(1), testutil.ToFloat64(metricsStore.EventsDiscarded))
+	assert.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
+}
+
+func TestEventWatcher_EventAge_whenSeriesWithoutLastObservedTimeFallsBack(t *testing.T) {
+	var MaxEventAgeSeconds int64 = 300
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+	output := &bytes.Buffer{}
+	log.Logger = log.Logger.Output(output)
+
+	ew := newMockEventWatcher(MaxEventAgeSeconds, metricsStore)
+	startup := time.Now().Add(-10 * time.Minute)
+	ew.setStartUpTime(startup)
+
+	event := corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{Name: "event-series-zero"},
+		Series: &corev1.EventSeries{
+			LastObservedTime: metav1.MicroTime{},
+		},
+		LastTimestamp: metav1.Time{Time: startup.Add(8 * time.Minute)},
+	}
+
+	assert.False(t, ew.isEventDiscarded(&event))
+	ew.onEvent(&event)
+	assert.Contains(t, output.String(), "Received event")
+	assert.Equal(t, float64(1), testutil.ToFloat64(metricsStore.EventsProcessed))
 }
 
 func TestOnEvent_WithObjectMetadata(t *testing.T) {
@@ -307,4 +386,60 @@ func TestOnEvent_DeletedObjects(t *testing.T) {
 	require.Equal(t, map[string]string(nil), event.InvolvedObject.Annotations)
 	require.Equal(t, map[string]string(nil), event.InvolvedObject.Labels)
 	require.Equal(t, []metav1.OwnerReference(nil), event.InvolvedObject.OwnerReferences)
+}
+
+func TestEventWatcher_OnUpdate_ProcessesEvent(t *testing.T) {
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+
+	ew := newMockEventWatcher(300, metricsStore)
+	called := 0
+	var receivedName string
+	ew.fn = func(e *EnhancedEvent) {
+		called++
+		receivedName = e.Event.Name
+	}
+
+	startup := time.Now().Add(-10 * time.Minute)
+	ew.setStartUpTime(startup)
+	newEvent := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{Name: "event-update"},
+		InvolvedObject: corev1.ObjectReference{
+			UID:  "test",
+			Name: "test-1",
+		},
+		// 2 minutes (-10 + 8) after startup, within the 5 minute max age
+		EventTime: metav1.MicroTime{Time: startup.Add(8 * time.Minute)},
+	}
+
+	ew.OnUpdate(&corev1.Event{}, newEvent)
+
+	require.Equal(t, 1, called)
+	require.Equal(t, "event-update", receivedName)
+	require.Equal(t, float64(1), testutil.ToFloat64(metricsStore.EventsProcessed))
+}
+
+func TestEventWatcher_OnUpdate_DiscardsOldEvent(t *testing.T) {
+	metricsStore := metrics.NewMetricsStore("test_")
+	defer metrics.DestroyMetricsStore(metricsStore)
+
+	ew := newMockEventWatcher(300, metricsStore)
+	called := 0
+	ew.fn = func(e *EnhancedEvent) {
+		called++
+	}
+
+	startup := time.Now().Add(-10 * time.Minute)
+	ew.setStartUpTime(startup)
+	newEvent := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{Name: "event-too-old"},
+		// 7 minutes (-10 + 3) after startup, beyond the 5 minute max age
+		EventTime: metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
+	}
+
+	ew.OnUpdate(&corev1.Event{}, newEvent)
+
+	require.Equal(t, 0, called)
+	require.Equal(t, float64(0), testutil.ToFloat64(metricsStore.EventsProcessed))
+	require.Equal(t, float64(1), testutil.ToFloat64(metricsStore.EventsDiscarded))
 }
