@@ -64,13 +64,14 @@ This can be eventually used in production.
 
 8. Use the collected profile data to build the Go compiler with PGO:
 
-    Copy the profile to `pgo` directory:
+    Copy/overwrite the profile to `default.pgo`:
 
     ```bash
-    cp path/to/profile123456789 pgo/name-of-your-profile
+    cp path/to/profile123456789 default.pgo
     ```
 
-    Modify the `Dockerfile` to include the profile data and build the Go compiler with PGO
+    Then (re)build the image as in step 1.
+
 
 ## Dynamically enable PGO in your application
 
