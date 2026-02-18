@@ -13,11 +13,11 @@ import (
 )
 
 type EventBridgeConfig struct {
-	DetailType   string                 `yaml:"detailType"`
-	Details      map[string]interface{} `yaml:"details"`
-	Source       string                 `yaml:"source"`
-	EventBusName string                 `yaml:"eventBusName"`
-	Region       string                 `yaml:"region"`
+	DetailType   string         `yaml:"detailType"`
+	Details      map[string]any `yaml:"details"`
+	Source       string         `yaml:"source"`
+	EventBusName string         `yaml:"eventBusName"`
+	Region       string         `yaml:"region"`
 }
 
 type EventBridgeSink struct {
@@ -27,7 +27,7 @@ type EventBridgeSink struct {
 
 func NewEventBridgeSink(cfg *EventBridgeConfig) (Sink, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(cfg.Region),
+		Region: new(cfg.Region),
 		Retryer: client.DefaultRetryer{
 			NumMaxRetries:    client.DefaultRetryerMaxNumRetries,
 			MinRetryDelay:    client.DefaultRetryerMinRetryDelay,

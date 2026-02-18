@@ -18,13 +18,13 @@ func TestLayoutConvert(t *testing.T) {
 	ev.FirstTimestamp = v1.Time{Time: time.Now()}
 
 	// Because Go, when parsing yaml, its []interface, not []string
-	var tagz interface{}
-	tagz = make([]interface{}, 2)
-	tagz.([]interface{})[0] = "sre"
-	tagz.([]interface{})[1] = "ops"
+	var tagz any
+	tagz = make([]any, 2)
+	tagz.([]any)[0] = "sre"
+	tagz.([]any)[1] = "ops"
 
-	layout := map[string]interface{}{
-		"details": map[interface{}]interface{}{
+	layout := map[string]any{
+		"details": map[any]any{
 			"message":   "{{ .Message }}",
 			"kind":      "{{ .InvolvedObject.Kind }}",
 			"name":      "{{ .InvolvedObject.Name }}",
@@ -41,7 +41,7 @@ func TestLayoutConvert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, res["eventType"], "kube-event")
 
-	val, ok := res["details"].(map[string]interface{})
+	val, ok := res["details"].(map[string]any)
 
 	require.True(t, ok, "cannot cast to event")
 

@@ -13,10 +13,10 @@ import (
 )
 
 type WebhookConfig struct {
-	Layout   map[string]interface{} `yaml:"layout"`
-	Headers  map[string]string      `yaml:"headers"`
-	Endpoint string                 `yaml:"endpoint"`
-	TLS      TLS                    `yaml:"tls"`
+	Layout   map[string]any    `yaml:"layout"`
+	Headers  map[string]string `yaml:"headers"`
+	Endpoint string            `yaml:"endpoint"`
+	TLS      TLS               `yaml:"tls"`
 }
 
 func NewWebhook(cfg *WebhookConfig) (Sink, error) {

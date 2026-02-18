@@ -19,7 +19,6 @@ func TestParseLogLevel(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			got := parseLogLevel(tc.input)
 			if got != tc.want {

@@ -18,11 +18,11 @@ import (
 )
 
 // Returns a map filtering out keys that have nil value assigned.
-func bigQueryDropNils(x map[string]interface{}) map[string]interface{} {
-	y := make(map[string]interface{})
+func bigQueryDropNils(x map[string]any) map[string]any {
+	y := make(map[string]any)
 	for key, value := range x {
 		if value != nil {
-			if mapValue, ok := value.(map[string]interface{}); ok {
+			if mapValue, ok := value.(map[string]any); ok {
 				y[key] = bigQueryDropNils(mapValue)
 			} else {
 				y[key] = value
@@ -49,10 +49,10 @@ func bigQuerySanitizeKey(key string) string {
 }
 
 // Returns a map copy with fixed keys.
-func bigQuerySanitizeKeys(x map[string]interface{}) map[string]interface{} {
-	y := make(map[string]interface{})
+func bigQuerySanitizeKeys(x map[string]any) map[string]any {
+	y := make(map[string]any)
 	for key, value := range x {
-		if mapValue, ok := value.(map[string]interface{}); ok {
+		if mapValue, ok := value.(map[string]any); ok {
 			y[bigQuerySanitizeKey(key)] = bigQuerySanitizeKeys(mapValue)
 		} else {
 			y[bigQuerySanitizeKey(key)] = value
@@ -61,7 +61,7 @@ func bigQuerySanitizeKeys(x map[string]interface{}) map[string]interface{} {
 	return y
 }
 
-func bigQueryWriteBatchToJsonFile(items []interface{}, path string) error {
+func bigQueryWriteBatchToJsonFile(items []any, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -69,9 +69,9 @@ func bigQueryWriteBatchToJsonFile(items []interface{}, path string) error {
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
-	for i := 0; i < len(items); i++ {
+	for i := range items {
 		event := items[i].(*kube.EnhancedEvent)
-		var mapStruct map[string]interface{}
+		var mapStruct map[string]any
 		json.Unmarshal(event.ToJSON(), &mapStruct)
 		jsonBytes, _ := json.Marshal(bigQuerySanitizeKeys(bigQueryDropNils(mapStruct)))
 		fmt.Fprintln(writer, string(jsonBytes))
@@ -182,9 +182,9 @@ func NewBigQuerySink(cfg *BigQueryConfig) (*BigQuerySink, error) {
 	}
 
 	rand.Seed(time.Now().UTC().UnixNano())
-	handleBatch := func(ctx context.Context, items []interface{}) []bool {
+	handleBatch := func(ctx context.Context, items []any) []bool {
 		res := make([]bool, len(items))
-		for i := 0; i < len(items); i++ {
+		for i := range items {
 			res[i] = true
 		}
 		path := fmt.Sprintf("/tmp/bq_batch-%d-%04x.json", time.Now().UTC().Unix(), rand.Uint64()%65535)

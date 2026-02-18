@@ -36,7 +36,7 @@ type OpsCenterSink struct {
 // NewOpsCenterSink returns a new OpsCenterSink.
 func NewOpsCenterSink(cfg *OpsCenterConfig) (Sink, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(cfg.Region)},
+		Region: new(cfg.Region)},
 	)
 	if err != nil {
 		return nil, err
@@ -56,17 +56,17 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 	if err != nil {
 		return err
 	}
-	oi.Title = aws.String(t)
+	oi.Title = new(t)
 	d, err := GetString(ev, s.cfg.Description)
 	if err != nil {
 		return err
 	}
-	oi.Description = aws.String(d)
+	oi.Description = new(d)
 	su, err := GetString(ev, s.cfg.Source)
 	if err != nil {
 		return err
 	}
-	oi.Source = aws.String(su)
+	oi.Source = new(su)
 
 	// Category is optional although highly recommended
 	if len(s.cfg.Category) != 0 {
@@ -74,7 +74,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 		if err != nil {
 			return err
 		}
-		oi.Category = aws.String(c)
+		oi.Category = new(c)
 	}
 
 	// Severity is optional although highly recommended
@@ -83,7 +83,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 		if err != nil {
 			return err
 		}
-		oi.Severity = aws.String(se)
+		oi.Severity = new(se)
 	}
 
 	// Priority is optional although highly recommended
@@ -96,7 +96,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 		if err != nil {
 			return fmt.Errorf("Priority is a non int")
 		}
-		oi.Priority = aws.Int64(n)
+		oi.Priority = new(n)
 	}
 	if s.cfg.OperationalData != nil {
 		oids := make(map[string]*ssm.OpsItemDataValue)
@@ -105,7 +105,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 			if err != nil {
 				return err
 			}
-			oids[k] = &ssm.OpsItemDataValue{Type: aws.String("SearchableString"), Value: aws.String(dv)}
+			oids[k] = &ssm.OpsItemDataValue{Type: new("SearchableString"), Value: new(dv)}
 		}
 		oi.OperationalData = oids
 	}
@@ -116,7 +116,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 			if err != nil {
 				return err
 			}
-			tvs = append(tvs, &ssm.Tag{Key: aws.String(k), Value: aws.String(tv)})
+			tvs = append(tvs, &ssm.Tag{Key: new(k), Value: new(tv)})
 		}
 		oi.Tags = tvs
 	}
@@ -127,7 +127,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 			if err != nil {
 				return err
 			}
-			ris = append(ris, &ssm.RelatedOpsItem{OpsItemId: aws.String(ri)})
+			ris = append(ris, &ssm.RelatedOpsItem{OpsItemId: new(ri)})
 		}
 		oi.RelatedOpsItems = ris
 	}
@@ -138,7 +138,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 			if err != nil {
 				return err
 			}
-			ns = append(ns, &ssm.OpsItemNotification{Arn: aws.String(n)})
+			ns = append(ns, &ssm.OpsItemNotification{Arn: new(n)})
 		}
 		oi.Notifications = ns
 	}

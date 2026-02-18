@@ -19,8 +19,8 @@ import (
 
 // KafkaConfig is the Kafka producer configuration
 type KafkaConfig struct {
-	KafkaEncode Avro                   `yaml:"avro"`
-	Layout      map[string]interface{} `yaml:"layout"`
+	KafkaEncode Avro           `yaml:"avro"`
+	Layout      map[string]any `yaml:"layout"`
 	SASL        struct {
 		Username  string `yaml:"username"`
 		Password  string `yaml:"password"`

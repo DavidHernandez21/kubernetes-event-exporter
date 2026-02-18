@@ -9,9 +9,9 @@ import (
 )
 
 type SNSConfig struct {
-	Layout   map[string]interface{} `yaml:"layout"`
-	TopicARN string                 `yaml:"topicARN"`
-	Region   string                 `yaml:"region"`
+	Layout   map[string]any `yaml:"layout"`
+	TopicARN string         `yaml:"topicARN"`
+	Region   string         `yaml:"region"`
 }
 
 type SNSSink struct {
@@ -21,7 +21,7 @@ type SNSSink struct {
 
 func NewSNSSink(cfg *SNSConfig) (Sink, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(cfg.Region)},
+		Region: new(cfg.Region)},
 	)
 	if err != nil {
 		return nil, err
@@ -41,8 +41,8 @@ func (s *SNSSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 	}
 
 	_, err := s.svc.PublishWithContext(ctx, &sns.PublishInput{
-		Message:  aws.String(string(toSend)),
-		TopicArn: aws.String(s.cfg.TopicARN),
+		Message:  new(string(toSend)),
+		TopicArn: new(s.cfg.TopicARN),
 	})
 
 	return err
