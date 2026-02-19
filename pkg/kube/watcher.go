@@ -165,11 +165,9 @@ func (e *eventWatcher) OnDelete(obj any) {
 }
 
 func (e *eventWatcher) Start() {
-	e.wg.Add(1)
-	go func() {
-		defer e.wg.Done()
+	e.wg.Go(func() {
 		e.informer.Run(e.stopper)
-	}()
+	})
 }
 
 func (e *eventWatcher) Stop() {

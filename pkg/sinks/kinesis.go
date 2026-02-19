@@ -10,9 +10,9 @@ import (
 )
 
 type KinesisConfig struct {
-	Layout     map[string]interface{} `yaml:"layout"`
-	StreamName string                 `yaml:"streamName"`
-	Region     string                 `yaml:"region"`
+	Layout     map[string]any `yaml:"layout"`
+	StreamName string         `yaml:"streamName"`
+	Region     string         `yaml:"region"`
 }
 
 type KinesisSink struct {
@@ -22,7 +22,7 @@ type KinesisSink struct {
 
 func NewKinesisSink(cfg *KinesisConfig) (Sink, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(cfg.Region)},
+		Region: new(cfg.Region)},
 	)
 	if err != nil {
 		return nil, err
@@ -53,8 +53,8 @@ func (k *KinesisSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 
 	_, err := k.svc.PutRecord(&kinesis.PutRecordInput{
 		Data:         toSend,
-		PartitionKey: aws.String(string(ev.UID)),
-		StreamName:   aws.String(k.cfg.StreamName),
+		PartitionKey: new(string(ev.UID)),
+		StreamName:   new(k.cfg.StreamName),
 	})
 
 	return err

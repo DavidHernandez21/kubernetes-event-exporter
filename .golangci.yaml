@@ -135,3 +135,11 @@ linters:
       - linters:
           - staticcheck
         text: "is deprecated: aws-sdk-go is deprecated"
+      - linters:
+          - gosec
+        text: "G704: SSRF via taint analysis"
+        path: pkg/sinks/loki.go
+      - linters:
+          - gosec
+        text: "G704: SSRF via taint analysis"
+        path: pkg/sinks/webhook.go

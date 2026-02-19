@@ -11,9 +11,9 @@ import (
 )
 
 type FirehoseConfig struct {
-	Layout             map[string]interface{} `yaml:"layout"`
-	DeliveryStreamName string                 `yaml:"deliveryStreamName"`
-	Region             string                 `yaml:"region"`
+	Layout             map[string]any `yaml:"layout"`
+	DeliveryStreamName string         `yaml:"deliveryStreamName"`
+	Region             string         `yaml:"region"`
 	// DeDot all labels and annotations in the event. For both the event and the involvedObject
 	DeDot bool `yaml:"deDot"`
 }
@@ -25,7 +25,7 @@ type FirehoseSink struct {
 
 func NewFirehoseSink(cfg *FirehoseConfig) (Sink, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(cfg.Region)},
+		Region: new(cfg.Region)},
 	)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (f *FirehoseSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 		Record: &firehose.Record{
 			Data: toSend,
 		},
-		DeliveryStreamName: aws.String(f.cfg.DeliveryStreamName),
+		DeliveryStreamName: new(f.cfg.DeliveryStreamName),
 	})
 
 	return err

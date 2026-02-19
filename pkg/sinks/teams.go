@@ -13,9 +13,9 @@ import (
 )
 
 type TeamsConfig struct {
-	Layout   map[string]interface{} `yaml:"layout"`
-	Headers  map[string]string      `yaml:"headers"`
-	Endpoint string                 `yaml:"endpoint"`
+	Layout   map[string]any    `yaml:"layout"`
+	Headers  map[string]string `yaml:"headers"`
+	Endpoint string            `yaml:"endpoint"`
 }
 
 func NewTeamsSink(cfg *TeamsConfig) (Sink, error) {
@@ -36,7 +36,7 @@ func (w *Teams) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 		return err
 	}
 
-	var eventData map[string]interface{}
+	var eventData map[string]any
 	json.Unmarshal([]byte(event), &eventData)
 	output := fmt.Sprintf("Event: %s \nStatus: %s \nMetadata: %s", eventData["message"], eventData["reason"], eventData["metadata"])
 

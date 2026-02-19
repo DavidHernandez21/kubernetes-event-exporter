@@ -9,9 +9,9 @@ import (
 )
 
 type SQSConfig struct {
-	Layout    map[string]interface{} `yaml:"layout"`
-	QueueName string                 `yaml:"queueName"`
-	Region    string                 `yaml:"region"`
+	Layout    map[string]any `yaml:"layout"`
+	QueueName string         `yaml:"queueName"`
+	Region    string         `yaml:"region"`
 }
 
 type SQSSink struct {
@@ -22,7 +22,7 @@ type SQSSink struct {
 
 func NewSQSSink(cfg *SQSConfig) (Sink, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(cfg.Region)},
+		Region: new(cfg.Region)},
 	)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (s *SQSSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 	}
 
 	_, err := s.svc.SendMessageWithContext(ctx, &sqs.SendMessageInput{
-		MessageBody: aws.String(string(toSend)),
+		MessageBody: new(string(toSend)),
 		QueueUrl:    &s.queueURL,
 	})
 

@@ -18,16 +18,16 @@ import (
 )
 
 type ElasticsearchConfig struct {
-	Headers     map[string]string      `yaml:"headers"` // Can be used to append additional key value pairs into the request headers
-	Layout      map[string]interface{} `yaml:"layout"`
-	TLS         TLS                    `yaml:"tls"`
-	Username    string                 `yaml:"username"`
-	Password    string                 `yaml:"password"`
-	CloudID     string                 `yaml:"cloudID"`
-	APIKey      string                 `yaml:"apiKey"`
-	Index       string                 `yaml:"index"`
-	IndexFormat string                 `yaml:"indexFormat"`
-	Type        string                 `yaml:"type"`
+	Headers     map[string]string `yaml:"headers"` // Can be used to append additional key value pairs into the request headers
+	Layout      map[string]any    `yaml:"layout"`
+	TLS         TLS               `yaml:"tls"`
+	Username    string            `yaml:"username"`
+	Password    string            `yaml:"password"`
+	CloudID     string            `yaml:"cloudID"`
+	APIKey      string            `yaml:"apiKey"`
+	Index       string            `yaml:"index"`
+	IndexFormat string            `yaml:"indexFormat"`
+	Type        string            `yaml:"type"`
 	// Connection specific
 	Hosts []string `yaml:"hosts"`
 	// Indexing preferences
@@ -83,7 +83,7 @@ func formatIndexName(pattern string, when time.Time) string {
 	current := 0
 	var builder strings.Builder
 
-	for i := 0; i < len(m); i++ {
+	for i := range m {
 		pair := m[i]
 
 		builder.WriteString(pattern[current:pair[0]])

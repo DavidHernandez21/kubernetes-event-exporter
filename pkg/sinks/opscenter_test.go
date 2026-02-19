@@ -22,7 +22,7 @@ type mockedCreateOps struct {
 
 func newMockedCreateOps(id string) *mockedCreateOps {
 	return &mockedCreateOps{
-		Resp: ssm.CreateOpsItemOutput{OpsItemId: aws.String(id)},
+		Resp: ssm.CreateOpsItemOutput{OpsItemId: new(id)},
 	}
 
 }
@@ -39,7 +39,7 @@ func (m *mockedCreateOps) GetInput() ssm.CreateOpsItemInput {
 func makeNotifications(input ...string) []*ssm.OpsItemNotification {
 	ns := make([]*ssm.OpsItemNotification, 0)
 	for _, v := range input {
-		ns = append(ns, &ssm.OpsItemNotification{Arn: aws.String(v)})
+		ns = append(ns, &ssm.OpsItemNotification{Arn: new(v)})
 	}
 	return ns
 }
@@ -47,7 +47,7 @@ func makeNotifications(input ...string) []*ssm.OpsItemNotification {
 func makeRelatedOpsItems(input ...string) []*ssm.RelatedOpsItem {
 	ris := make([]*ssm.RelatedOpsItem, 0)
 	for _, v := range input {
-		ris = append(ris, &ssm.RelatedOpsItem{OpsItemId: aws.String(v)})
+		ris = append(ris, &ssm.RelatedOpsItem{OpsItemId: new(v)})
 	}
 	return ris
 }
@@ -55,14 +55,14 @@ func makeRelatedOpsItems(input ...string) []*ssm.RelatedOpsItem {
 func makeTags(input map[string]string) []*ssm.Tag {
 	tvs := make([]*ssm.Tag, 0)
 	for k, v := range input {
-		tvs = append(tvs, &ssm.Tag{Key: aws.String(k), Value: aws.String(v)})
+		tvs = append(tvs, &ssm.Tag{Key: new(k), Value: new(v)})
 	}
 	return tvs
 }
 func makeOperationalData(input map[string]string) map[string]*ssm.OpsItemDataValue {
 	oids := make(map[string]*ssm.OpsItemDataValue)
 	for k, v := range input {
-		oids[k] = &ssm.OpsItemDataValue{Type: aws.String("SearchableString"), Value: aws.String(v)}
+		oids[k] = &ssm.OpsItemDataValue{Type: new("SearchableString"), Value: new(v)}
 	}
 	return oids
 }
@@ -110,16 +110,16 @@ func TestOpsCenterSink_Send(t *testing.T) {
 			m,
 		}, args{context.Background(), ev}, false,
 			ssm.CreateOpsItemInput{
-				Category:        aws.String("my reason"),
-				Description:     aws.String("Event my reason for prod/nginx-server-123abc-456def on K8s cluster"),
+				Category:        new("my reason"),
+				Description:     new("Event my reason for prod/nginx-server-123abc-456def on K8s cluster"),
 				Notifications:   makeNotifications("sns1", "sns2"),
 				OperationalData: makeOperationalData(map[string]string{"Reason": "my reason"}),
 				Priority:        aws.Int64(6),
 				RelatedOpsItems: makeRelatedOpsItems("my reason"),
-				Severity:        aws.String("6"),
-				Source:          aws.String("production"),
+				Severity:        new("6"),
+				Source:          new("production"),
 				Tags:            makeTags(map[string]string{"ENV": "prod"}),
-				Title:           aws.String("Successfully pulled image \"nginx:latest\""),
+				Title:           new("Successfully pulled image \"nginx:latest\""),
 			},
 		},
 		{"Invalid Priority: Want err", fields{

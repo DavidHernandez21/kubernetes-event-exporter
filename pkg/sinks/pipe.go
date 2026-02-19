@@ -10,8 +10,8 @@ import (
 )
 
 type PipeConfig struct {
-	Layout map[string]interface{} `yaml:"layout"`
-	Path   string                 `yaml:"path"`
+	Layout map[string]any `yaml:"layout"`
+	Path   string         `yaml:"path"`
 	// DeDot all labels and annotations in the event. For both the event and the involvedObject
 	DeDot bool `yaml:"deDot"`
 }

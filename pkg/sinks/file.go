@@ -10,12 +10,12 @@ import (
 )
 
 type FileConfig struct {
-	Layout     map[string]interface{} `yaml:"layout"`
-	Path       string                 `yaml:"path"`
-	MaxSize    int                    `yaml:"maxsize"`
-	MaxAge     int                    `yaml:"maxage"`
-	MaxBackups int                    `yaml:"maxbackups"`
-	DeDot      bool                   `yaml:"deDot"`
+	Layout     map[string]any `yaml:"layout"`
+	Path       string         `yaml:"path"`
+	MaxSize    int            `yaml:"maxsize"`
+	MaxAge     int            `yaml:"maxage"`
+	MaxBackups int            `yaml:"maxbackups"`
+	DeDot      bool           `yaml:"deDot"`
 }
 
 func (f *FileConfig) Validate() error {
@@ -25,7 +25,7 @@ func (f *FileConfig) Validate() error {
 type File struct {
 	writer  io.WriteCloser
 	encoder *json.Encoder
-	layout  map[string]interface{}
+	layout  map[string]any
 	DeDot   bool
 }
 

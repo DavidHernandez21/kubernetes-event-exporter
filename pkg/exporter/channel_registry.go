@@ -17,7 +17,7 @@ import (
 // On closing, the registry sends a signal on all exit channels, and then waits for all to complete.
 type ChannelBasedReceiverRegistry struct {
 	ch           map[string]chan kube.EnhancedEvent
-	exitCh       map[string]chan interface{}
+	exitCh       map[string]chan any
 	wg           *sync.WaitGroup
 	MetricsStore *metrics.Store
 }
@@ -36,11 +36,11 @@ func (r *ChannelBasedReceiverRegistry) SendEvent(name string, event *kube.Enhanc
 func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink) {
 	if r.ch == nil {
 		r.ch = make(map[string]chan kube.EnhancedEvent)
-		r.exitCh = make(map[string]chan interface{})
+		r.exitCh = make(map[string]chan any)
 	}
 
 	ch := make(chan kube.EnhancedEvent)
-	exitCh := make(chan interface{})
+	exitCh := make(chan any)
 
 	r.ch[name] = ch
 	r.exitCh[name] = exitCh
