@@ -278,7 +278,7 @@ SQS is an AWS service for message queuing that allows high throughput messaging.
 receivers:
   - name: "sqs"
     sqs:
-      queueName: "/tmp/dump"
+      queueName: "kube-events"
       region: us-west-2
       endpoint: "http://localhost:4566" # Optional; useful for LocalStack
       layout: # Optional
