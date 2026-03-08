@@ -35,6 +35,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v6
       - uses: actions/cache@v5
         with:
           path: |
@@ -48,9 +50,6 @@ jobs:
         with:
           go-version: "1.26.1"
         id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
 
       - name: Build
         run: go build -v .
@@ -64,6 +63,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.sqs == 'true'
     steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v6
       - uses: actions/cache@v5
         with:
           path: |
@@ -77,9 +78,6 @@ jobs:
         with:
           go-version: "1.26.1"
         id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
 
       - name: Test SQS integration
         run: go test -tags=integration ./pkg/sinks -run ^TestSQSSinkLocalStack$
