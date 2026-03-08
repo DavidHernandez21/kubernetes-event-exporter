@@ -66,6 +66,13 @@ func buildSQSClient(ctx context.Context, cfg *SQSConfig) (sqsAPI, error) {
 }
 
 func newSQSSinkWithClient(ctx context.Context, cfg *SQSConfig, svc sqsAPI) (Sink, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("sqs config is nil")
+	}
+	if svc == nil {
+		return nil, fmt.Errorf("sqs client is nil")
+	}
+
 	out, err := svc.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
 		QueueName: aws.String(cfg.QueueName),
 	})
