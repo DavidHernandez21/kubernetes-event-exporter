@@ -125,3 +125,8 @@ receivers:
       deliveryStreamName: "kubernetes-events"
       region: "us-east-1"
       deDot: true
+  - name: "sqs"
+    sqs:
+      queueName: "kube-events"
+      region: "us-east-1"
+      endpoint: "http://localhost:4566" # Optional; useful for LocalStack

@@ -280,6 +280,7 @@ receivers:
     sqs:
       queueName: "/tmp/dump"
       region: us-west-2
+      endpoint: "http://localhost:4566" # Optional; useful for LocalStack
       layout: # Optional
 ```
 
