@@ -8,7 +8,7 @@ require (
 	github.com/IBM/sarama v1.47.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/aws/aws-sdk-go v1.55.8
-	github.com/aws/aws-sdk-go-v2 v1.41.3
+	github.com/aws/aws-sdk-go-v2 v1.41.4
 	github.com/aws/aws-sdk-go-v2/config v1.32.11
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.23
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
