@@ -19,7 +19,7 @@ require (
 	github.com/opsgenie/opsgenie-go-sdk-v2 v1.2.23
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/exporter-toolkit v0.15.1
-	github.com/rs/zerolog v1.34.0
+	github.com/rs/zerolog v1.35.0
 	github.com/slack-go/slack v0.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
