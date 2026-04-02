@@ -26,14 +26,12 @@ func TestSQSSinkLocalStack(t *testing.T) {
 	t.Setenv("TESTCONTAINERS_HOST_OVERRIDE", "127.0.0.1")
 	container, err := localstack.Run(
 		ctx,
-		"localstack/localstack:4.14.0",
+		"nahuelnucera/ministack:latest",
 		testcontainers.WithEnv(map[string]string{
-			"SERVICES":              "sqs",
-			"EAGER_SERVICE_LOADING": "1",
-			"LOCALSTACK_HOST":       "127.0.0.1",
+			"MINISTACK_HOST":       "127.0.0.1",
 		}),
 		testcontainers.WithWaitStrategy(
-			wait.ForHTTP("/_localstack/health").WithPort("4566/tcp").WithStatusCodeMatcher(func(code int) bool {
+			wait.ForHTTP("/_ministack/health").WithPort("4566/tcp").WithStatusCodeMatcher(func(code int) bool {
 				return code >= 200 && code < 300
 			}).WithStartupTimeout(2*time.Minute),
 		),
