@@ -34,7 +34,8 @@ func TestSNSSinkSendPublishesMessage(t *testing.T) {
 		},
 	}
 
-	sink := newSNSSinkWithClient(cfg, client)
+	sink, err := newSNSSinkWithClient(cfg, client)
+	require.NoError(t, err)
 	require.NoError(t, sink.Send(context.Background(), ev))
 }
 
@@ -55,8 +56,9 @@ func TestSNSSinkSendTemplateError(t *testing.T) {
 		},
 	}
 
-	sink := newSNSSinkWithClient(cfg, client)
-	err := sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	sink, err := newSNSSinkWithClient(cfg, client)
+	require.NoError(t, err)
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
 	require.Error(t, err)
 	require.False(t, publishCalled)
 }
@@ -70,7 +72,8 @@ func TestSNSSinkSendPropagatesError(t *testing.T) {
 		},
 	}
 
-	sink := newSNSSinkWithClient(cfg, client)
-	err := sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	sink, err := newSNSSinkWithClient(cfg, client)
+	require.NoError(t, err)
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
 	require.ErrorIs(t, err, publishErr)
 }

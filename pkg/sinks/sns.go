@@ -33,7 +33,7 @@ func NewSNSSink(cfg *SNSConfig) (Sink, error) {
 		return nil, err
 	}
 
-	return newSNSSinkWithClient(cfg, svc), nil
+	return newSNSSinkWithClient(cfg, svc)
 }
 
 func buildSNSClient(ctx context.Context, cfg *SNSConfig) (snsAPI, error) {
@@ -58,11 +58,18 @@ func buildSNSClient(ctx context.Context, cfg *SNSConfig) (snsAPI, error) {
 	return sns.NewFromConfig(awsCfg), nil
 }
 
-func newSNSSinkWithClient(cfg *SNSConfig, svc snsAPI) *SNSSink {
+func newSNSSinkWithClient(cfg *SNSConfig, svc snsAPI) (Sink, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("sns config is nil")
+	}
+	if svc == nil {
+		return nil, fmt.Errorf("sns client is nil")
+	}
+
 	return &SNSSink{
 		cfg: cfg,
 		svc: svc,
-	}
+	}, nil
 }
 
 func (s *SNSSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
