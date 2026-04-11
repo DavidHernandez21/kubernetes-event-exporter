@@ -21,7 +21,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/exporter-toolkit v0.15.1
 	github.com/rs/zerolog v1.35.0
-	github.com/slack-go/slack v0.20.0
+	github.com/slack-go/slack v0.21.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/localstack v0.40.0
