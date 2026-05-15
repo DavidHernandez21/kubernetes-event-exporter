@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	cloud.google.com/go/bigquery v1.77.0
-	cloud.google.com/go/pubsub v1.50.2
+	cloud.google.com/go/pubsub/v2 v2.6.0
 	github.com/IBM/sarama v1.48.2
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/aws/aws-sdk-go-v2 v1.41.7
@@ -39,7 +39,6 @@ require (
 require (
 	cloud.google.com/go/auth v0.20.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
-	cloud.google.com/go/pubsub/v2 v2.6.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
