@@ -13,7 +13,7 @@ flowchart TD
     A --> G[Create Kubernetes event watcher]
     G --> H[Watcher receives core event]
     H --> H1{Older than max event age}
-    H1 -- yes --> HX[Discard event and count metric]
+    H1 -- yes --> HX[Discard event; increment `EventsDiscarded` only for events created after watcher startup]
     H1 -- no --> H2[Create enhanced event]
     H2 --> H3{Omit metadata lookup}
     H3 -- no --> H4[Lookup object metadata with cache]

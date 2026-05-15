@@ -9,8 +9,8 @@ classDiagram
 %% Interfaces-only contracts
 class Sink {
   <<interface>>
-  +Send(ctx context.Context, event *kube.EnhancedEvent) error
-  +Close() error
+  +Send(ctx context.Context, ev *kube.EnhancedEvent) error
+  +Close()
 }
 class ReceiverRegistry {
   <<interface>>
@@ -42,7 +42,6 @@ sequenceDiagram
 participant Watcher as kube.eventWatcher
 participant Lookup as objectMetadataProvider
 participant Engine as exporter.Engine
-participant Router as exporter.Router
 participant Route as exporter.Route
 participant Registry as exporter.ReceiverRegistry
 participant Sink as Sink
@@ -52,14 +51,11 @@ alt metadata added
 Lookup-->>Watcher: enriched event
 end
 Watcher->>Engine: OnEvent(enhancedEvent)
-Engine->>Router: route(event)
-Router->>Route: ProcessEvent(event)
+Engine->>Route: ProcessEvent(event)
 Route->>Rule: MatchesEvent(event)?
 alt matched
-Route->>Registry: SendEvent(receiverName, event)
-Registry->>Sink: Send(ctx, event)
-Sink-->>Registry: error or nil
-Registry-->>Engine: delivery result
+Route->>Registry: SendEvent(receiverName, ev)
+Registry->>Sink: Send(ctx, ev)
 else not matched / dropped
 Route-->>Engine: dropped
 end
