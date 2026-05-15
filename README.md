@@ -7,6 +7,14 @@ observability or alerting purposes. You won't believe what you are missing.
 
 I think exporting to sinks should be done outside of this repository. For simplicity I will not modify the current implementation, but in the future it would be better to have a plugin based architecture so that users can add their own sinks without modifying the core code.
 
+## Architecture
+
+High-level architecture diagrams are available in the `docs/` folder:
+
+- [Flowchart and architecture overview](docs/architecture.md)
+- [Contracts (interfaces) and sequence diagram](docs/contracts.md)
+
+
 ## Deployment
 
 Head on to `deploy/` folder and apply the YAMLs in the given filename order. Do not forget to modify the
