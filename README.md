@@ -239,6 +239,7 @@ receivers:
     kinesis:
       streamName: "events-pipeline"
       region: us-west-2
+      endpoint: "http://localhost:4566" # Optional; useful for LocalStack
       layout: # Optional
 ```
 
@@ -376,6 +377,7 @@ receivers:
     - Reason: ""{ { .Reason } }"}"
   priority: "6", # Optional
   region: "us-east1",
+  endpoint: "http://localhost:4566", # Optional; useful for LocalStack
   relatedOpsItems: # Optional: OpsItems ARN
     - "ops1"
     - "ops2"

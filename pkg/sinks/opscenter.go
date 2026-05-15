@@ -6,10 +6,10 @@ import (
 	"strconv"
 
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
 // OpsCenterConfig is the configuration of the Sink.
@@ -25,24 +25,60 @@ type OpsCenterConfig struct {
 	Title           string            `yaml:"title"`
 	Notifications   []string          `yaml:"notifications"`
 	RelatedOpsItems []string          `yaml:"relatedOpsItems"`
+	Endpoint        string            `yaml:"endpoint"`
 }
 
 // OpsCenterSink is an AWS OpsCenter notifcation path.
 type OpsCenterSink struct {
 	cfg *OpsCenterConfig
-	svc ssmiface.SSMAPI
+	svc opsCenterAPI
 }
 
 // NewOpsCenterSink returns a new OpsCenterSink.
 func NewOpsCenterSink(cfg *OpsCenterConfig) (Sink, error) {
-	sess, err := session.NewSession(&aws.Config{
-		Region: new(cfg.Region)},
-	)
+	ctx := context.Background()
+	svc, err := buildOpsCenterClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	svc := ssm.New(sess)
+	return newOpsCenterSinkWithClient(cfg, svc)
+}
+
+type opsCenterAPI interface {
+	CreateOpsItem(ctx context.Context, params *ssm.CreateOpsItemInput, optFns ...func(*ssm.Options)) (*ssm.CreateOpsItemOutput, error)
+}
+
+func buildOpsCenterClient(ctx context.Context, cfg *OpsCenterConfig) (opsCenterAPI, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("opscenter config is nil")
+	}
+
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Endpoint != "" {
+		return ssm.NewFromConfig(awsCfg, func(options *ssm.Options) {
+			options.Region = cfg.Region
+			options.BaseEndpoint = aws.String(cfg.Endpoint)
+			options.RetryMode = aws.RetryModeAdaptive
+			options.RetryMaxAttempts = 3
+		}), nil
+	}
+
+	return ssm.NewFromConfig(awsCfg), nil
+}
+
+func newOpsCenterSinkWithClient(cfg *OpsCenterConfig, svc opsCenterAPI) (Sink, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("opscenter config is nil")
+	}
+	if svc == nil {
+		return nil, fmt.Errorf("opscenter client is nil")
+	}
+
 	return &OpsCenterSink{
 		cfg: cfg,
 		svc: svc,
@@ -56,17 +92,17 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 	if err != nil {
 		return err
 	}
-	oi.Title = new(t)
+	oi.Title = aws.String(t)
 	d, err := GetString(ev, s.cfg.Description)
 	if err != nil {
 		return err
 	}
-	oi.Description = new(d)
+	oi.Description = aws.String(d)
 	su, err := GetString(ev, s.cfg.Source)
 	if err != nil {
 		return err
 	}
-	oi.Source = new(su)
+	oi.Source = aws.String(su)
 
 	// Category is optional although highly recommended
 	if len(s.cfg.Category) != 0 {
@@ -74,7 +110,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 		if err != nil {
 			return err
 		}
-		oi.Category = new(c)
+		oi.Category = aws.String(c)
 	}
 
 	// Severity is optional although highly recommended
@@ -83,7 +119,7 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 		if err != nil {
 			return err
 		}
-		oi.Severity = new(se)
+		oi.Severity = aws.String(se)
 	}
 
 	// Priority is optional although highly recommended
@@ -92,58 +128,59 @@ func (s *OpsCenterSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error 
 		if err != nil {
 			return err
 		}
-		n, err := strconv.ParseInt(p, 10, 64)
+		n, err := strconv.ParseInt(p, 10, 32)
 		if err != nil {
 			return fmt.Errorf("Priority is a non int")
 		}
-		oi.Priority = new(n)
+		pn := int32(n)
+		oi.Priority = &pn
 	}
 	if s.cfg.OperationalData != nil {
-		oids := make(map[string]*ssm.OpsItemDataValue)
+		oids := make(map[string]ssmtypes.OpsItemDataValue)
 		for k, v := range s.cfg.OperationalData {
 			dv, err := GetString(ev, v)
 			if err != nil {
 				return err
 			}
-			oids[k] = &ssm.OpsItemDataValue{Type: new("SearchableString"), Value: new(dv)}
+			oids[k] = ssmtypes.OpsItemDataValue{Type: ssmtypes.OpsItemDataTypeSearchableString, Value: aws.String(dv)}
 		}
 		oi.OperationalData = oids
 	}
 	if s.cfg.Tags != nil {
-		tvs := make([]*ssm.Tag, 0)
+		tvs := make([]ssmtypes.Tag, 0)
 		for k, v := range s.cfg.Tags {
 			tv, err := GetString(ev, v)
 			if err != nil {
 				return err
 			}
-			tvs = append(tvs, &ssm.Tag{Key: new(k), Value: new(tv)})
+			tvs = append(tvs, ssmtypes.Tag{Key: aws.String(k), Value: aws.String(tv)})
 		}
 		oi.Tags = tvs
 	}
 	if s.cfg.RelatedOpsItems != nil {
-		ris := make([]*ssm.RelatedOpsItem, 0)
-		for _, v := range s.cfg.OperationalData {
+		ris := make([]ssmtypes.RelatedOpsItem, 0)
+		for _, v := range s.cfg.RelatedOpsItems {
 			ri, err := GetString(ev, v)
 			if err != nil {
 				return err
 			}
-			ris = append(ris, &ssm.RelatedOpsItem{OpsItemId: new(ri)})
+			ris = append(ris, ssmtypes.RelatedOpsItem{OpsItemId: aws.String(ri)})
 		}
 		oi.RelatedOpsItems = ris
 	}
 	if s.cfg.Notifications != nil {
-		ns := make([]*ssm.OpsItemNotification, 0)
+		ns := make([]ssmtypes.OpsItemNotification, 0)
 		for _, v := range s.cfg.Notifications {
 			n, err := GetString(ev, v)
 			if err != nil {
 				return err
 			}
-			ns = append(ns, &ssm.OpsItemNotification{Arn: new(n)})
+			ns = append(ns, ssmtypes.OpsItemNotification{Arn: aws.String(n)})
 		}
 		oi.Notifications = ns
 	}
 
-	_, createErr := s.svc.CreateOpsItemWithContext(ctx, &oi)
+	_, createErr := s.svc.CreateOpsItem(ctx, &oi)
 
 	return createErr
 }

@@ -6,14 +6,15 @@ package sinks
 import (
 	"context"
 	"fmt"
-	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
@@ -21,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func TestSQSSinkLocalStack(t *testing.T) {
+func TestOpsCenterSinkLocalStack(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv("TESTCONTAINERS_HOST_OVERRIDE", "127.0.0.1")
 	container, err := localstack.Run(
@@ -45,10 +46,9 @@ func TestSQSSinkLocalStack(t *testing.T) {
 	require.NoError(t, err)
 	mappedPort, err := container.MappedPort(ctx, "4566/tcp")
 	require.NoError(t, err)
-	endpointHost := normalizeHost(host)
-	endpoint := fmt.Sprintf("http://%s:%s", endpointHost, mappedPort.Port())
+	endpoint := fmt.Sprintf("http://%s:%s", normalizeHost(host), mappedPort.Port())
 	region := "us-east-1"
-	queueName := "kube-events"
+	source := fmt.Sprintf("kube-exporter-%d", time.Now().UnixNano())
 
 	t.Setenv("AWS_ACCESS_KEY_ID", "test")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
@@ -56,53 +56,50 @@ func TestSQSSinkLocalStack(t *testing.T) {
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	require.NoError(t, err)
 
-	client := sqs.NewFromConfig(awsCfg, func(options *sqs.Options) {
+	client := ssm.NewFromConfig(awsCfg, func(options *ssm.Options) {
 		options.Region = region
 		options.BaseEndpoint = aws.String(endpoint)
 		options.RetryMode = aws.RetryModeAdaptive
 		options.RetryMaxAttempts = 3
 	})
-	createOut, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String(queueName)})
-	require.NoError(t, err)
 
-	sink, err := NewSQSSink(&SQSConfig{
-		QueueName: queueName,
-		Region:    region,
-		Endpoint:  endpoint,
+	sink, err := NewOpsCenterSink(&OpsCenterConfig{
+		Title:       "{{ .Message }}",
+		Description: "{{ .Message }}",
+		Source:      source,
+		Region:      region,
+		Endpoint:    endpoint,
 	})
 	require.NoError(t, err)
 
-	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}}
-	require.NoError(t, sink.Send(ctx, ev))
-
-	queueURL := replaceURLHost(aws.ToString(createOut.QueueUrl), endpointHost)
-	recvOut, err := client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(queueURL),
-		MaxNumberOfMessages: 1,
-		WaitTimeSeconds:     1,
-	})
-	require.NoError(t, err)
-	require.Len(t, recvOut.Messages, 1)
-	require.Equal(t, string(ev.ToJSON()), aws.ToString(recvOut.Messages[0].Body))
-}
-
-func normalizeHost(host string) string {
-	if host == "localhost" {
-		return "127.0.0.1"
-	}
-	return host
-}
-
-func replaceURLHost(rawURL, host string) string {
-	parsed, err := url.Parse(rawURL)
+	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello from opscenter"}}
+	err = sink.Send(ctx, ev)
 	if err != nil {
-		return rawURL
+		errText := err.Error()
+		if strings.Contains(errText, "Unknown action: CreateOpsItem") || strings.Contains(errText, "InvalidAction") {
+			t.Skipf("localstack image does not support SSM CreateOpsItem: %v", err)
+		}
 	}
-	port := parsed.Port()
-	if port != "" {
-		parsed.Host = host + ":" + port
-		return parsed.String()
-	}
-	parsed.Host = host
-	return parsed.String()
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		out, err := client.DescribeOpsItems(ctx, &ssm.DescribeOpsItemsInput{
+			OpsItemFilters: []ssmtypes.OpsItemFilter{
+				{
+					Key:      ssmtypes.OpsItemFilterKeySource,
+					Operator: ssmtypes.OpsItemFilterOperatorEqual,
+					Values:   []string{source},
+				},
+			},
+		})
+		if err != nil {
+			return false
+		}
+		for _, item := range out.OpsItemSummaries {
+			if aws.ToString(item.Source) == source && aws.ToString(item.Title) == "hello from opscenter" {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Minute, 2*time.Second)
 }
