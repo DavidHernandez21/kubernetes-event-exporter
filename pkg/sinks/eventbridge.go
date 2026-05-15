@@ -3,13 +3,15 @@ package sinks
 import (
 	"context"
 	"encoding/json"
-	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/eventbridge"
-	"github.com/rs/zerolog/log"
+	"fmt"
 	"time"
+
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	eventbridge "github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	"github.com/rs/zerolog/log"
 )
 
 type EventBridgeConfig struct {
@@ -18,30 +20,58 @@ type EventBridgeConfig struct {
 	Source       string         `yaml:"source"`
 	EventBusName string         `yaml:"eventBusName"`
 	Region       string         `yaml:"region"`
+	Endpoint     string         `yaml:"endpoint"`
 }
 
 type EventBridgeSink struct {
 	cfg *EventBridgeConfig
-	svc *eventbridge.EventBridge
+	svc eventbridgeAPI
 }
 
 func NewEventBridgeSink(cfg *EventBridgeConfig) (Sink, error) {
-	sess, err := session.NewSession(&aws.Config{
-		Region: new(cfg.Region),
-		Retryer: client.DefaultRetryer{
-			NumMaxRetries:    client.DefaultRetryerMaxNumRetries,
-			MinRetryDelay:    client.DefaultRetryerMinRetryDelay,
-			MinThrottleDelay: client.DefaultRetryerMinThrottleDelay,
-			MaxRetryDelay:    client.DefaultRetryerMaxRetryDelay,
-			MaxThrottleDelay: client.DefaultRetryerMaxThrottleDelay,
-		},
-	},
-	)
+	ctx := context.Background()
+	svc, err := buildEventBridgeClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	svc := eventbridge.New(sess)
+	return newEventBridgeSinkWithClient(cfg, svc)
+}
+
+type eventbridgeAPI interface {
+	PutEvents(ctx context.Context, params *eventbridge.PutEventsInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutEventsOutput, error)
+}
+
+func buildEventBridgeClient(ctx context.Context, cfg *EventBridgeConfig) (eventbridgeAPI, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("eventbridge config is nil")
+	}
+
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Endpoint != "" {
+		return eventbridge.NewFromConfig(awsCfg, func(options *eventbridge.Options) {
+			options.Region = cfg.Region
+			options.BaseEndpoint = aws.String(cfg.Endpoint)
+			options.RetryMode = aws.RetryModeAdaptive
+			options.RetryMaxAttempts = 3
+		}), nil
+	}
+
+	return eventbridge.NewFromConfig(awsCfg), nil
+}
+
+func newEventBridgeSinkWithClient(cfg *EventBridgeConfig, svc eventbridgeAPI) (Sink, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("eventbridge config is nil")
+	}
+	if svc == nil {
+		return nil, fmt.Errorf("eventbridge client is nil")
+	}
+
 	return &EventBridgeSink{
 		cfg: cfg,
 		svc: svc,
@@ -66,18 +96,16 @@ func (s *EventBridgeSink) Send(ctx context.Context, ev *kube.EnhancedEvent) erro
 		toSend = string(ev.ToJSON())
 	}
 	tym := time.Now()
-	inputRequest := eventbridge.PutEventsRequestEntry{
-		Detail:       &toSend,
-		DetailType:   &s.cfg.DetailType,
+	inputRequest := eventbridgetypes.PutEventsRequestEntry{
+		Detail:       aws.String(toSend),
+		DetailType:   aws.String(s.cfg.DetailType),
 		Time:         &tym,
-		Source:       &s.cfg.Source,
-		EventBusName: &s.cfg.EventBusName,
+		Source:       aws.String(s.cfg.Source),
+		EventBusName: aws.String(s.cfg.EventBusName),
 	}
-	log.Info().Str("InputEvent", inputRequest.String()).Msg("Request")
+	log.Info().Str("InputEvent", toSend).Msg("Request")
 
-	req, _ := s.svc.PutEventsRequest(&eventbridge.PutEventsInput{Entries: []*eventbridge.PutEventsRequestEntry{&inputRequest}})
-	// TODO: Retry failed events
-	err := req.Send()
+	_, err := s.svc.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: []eventbridgetypes.PutEventsRequestEntry{inputRequest}})
 	if err != nil {
 		log.Error().Err(err).Msg("EventBridge Error")
 		return err

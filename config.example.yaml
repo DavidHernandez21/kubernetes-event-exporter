@@ -110,6 +110,7 @@ receivers:
       source: "cd"
       eventBusName: "default"
       region: "ap-southeast-1"
+      endpoint: "http://localhost:4566" # Optional; useful for LocalStack
       details:
         message: "{{ .Message }}"
         namespace: "{{ .Namespace }}"
@@ -124,6 +125,7 @@ receivers:
     firehose:
       deliveryStreamName: "kubernetes-events"
       region: "us-east-1"
+      endpoint: "http://localhost:4566" # Optional; useful for LocalStack
       deDot: true
   - name: "sqs"
     sqs:

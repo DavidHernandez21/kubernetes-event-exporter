@@ -2,73 +2,30 @@ package sinks
 
 import (
 	"context"
-	"reflect"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type mockedCreateOps struct {
-	ssmiface.SSMAPI
-	Resp  ssm.CreateOpsItemOutput
-	Input ssm.CreateOpsItemInput
+type opsCenterClientMock struct {
+	createOpsItem func(ctx context.Context, input *ssm.CreateOpsItemInput) (*ssm.CreateOpsItemOutput, error)
 }
 
-func newMockedCreateOps(id string) *mockedCreateOps {
-	return &mockedCreateOps{
-		Resp: ssm.CreateOpsItemOutput{OpsItemId: new(id)},
+func (m *opsCenterClientMock) CreateOpsItem(ctx context.Context, input *ssm.CreateOpsItemInput, _ ...func(*ssm.Options)) (*ssm.CreateOpsItemOutput, error) {
+	if m.createOpsItem == nil {
+		return nil, errors.New("create ops item not implemented")
 	}
-
+	return m.createOpsItem(ctx, input)
 }
 
-func (m *mockedCreateOps) CreateOpsItemWithContext(ctx aws.Context, in *ssm.CreateOpsItemInput, o ...request.Option) (*ssm.CreateOpsItemOutput, error) {
-	m.Input = *in
-	return &m.Resp, nil
-}
-
-func (m *mockedCreateOps) GetInput() ssm.CreateOpsItemInput {
-	return m.Input
-}
-
-func makeNotifications(input ...string) []*ssm.OpsItemNotification {
-	ns := make([]*ssm.OpsItemNotification, 0)
-	for _, v := range input {
-		ns = append(ns, &ssm.OpsItemNotification{Arn: new(v)})
-	}
-	return ns
-}
-
-func makeRelatedOpsItems(input ...string) []*ssm.RelatedOpsItem {
-	ris := make([]*ssm.RelatedOpsItem, 0)
-	for _, v := range input {
-		ris = append(ris, &ssm.RelatedOpsItem{OpsItemId: new(v)})
-	}
-	return ris
-}
-
-func makeTags(input map[string]string) []*ssm.Tag {
-	tvs := make([]*ssm.Tag, 0)
-	for k, v := range input {
-		tvs = append(tvs, &ssm.Tag{Key: new(k), Value: new(v)})
-	}
-	return tvs
-}
-func makeOperationalData(input map[string]string) map[string]*ssm.OpsItemDataValue {
-	oids := make(map[string]*ssm.OpsItemDataValue)
-	for k, v := range input {
-		oids[k] = &ssm.OpsItemDataValue{Type: new("SearchableString"), Value: new(v)}
-	}
-	return oids
-}
-
-func TestOpsCenterSink_Send(t *testing.T) {
-	m := newMockedCreateOps("id123456")
+func TestOpsCenterSinkSendCreatesOpsItem(t *testing.T) {
 	ev := &kube.EnhancedEvent{}
 	ev.Namespace = "default"
 	ev.Reason = "my reason"
@@ -78,81 +35,66 @@ func TestOpsCenterSink_Send(t *testing.T) {
 	ev.InvolvedObject.Namespace = "prod"
 	ev.Message = "Successfully pulled image \"nginx:latest\""
 	ev.FirstTimestamp = v1.Time{Time: time.Now()}
-	type fields struct {
-		cfg *OpsCenterConfig
-		svc ssmiface.SSMAPI
+
+	cfg := &OpsCenterConfig{
+		Title:           "{{ .Message }}",
+		Category:        "{{ .Reason }}",
+		Description:     "Event {{ .Reason }} for {{ .InvolvedObject.Namespace }}/{{ .InvolvedObject.Name }} on K8s cluster",
+		Notifications:   []string{"sns1", "sns2"},
+		OperationalData: map[string]string{"Reason": "{{ .Reason }}"},
+		Priority:        "6",
+		Region:          "us-east1",
+		RelatedOpsItems: []string{"ops1", "ops2"},
+		Severity:        "6",
+		Source:          "production",
+		Tags:            map[string]string{"ENV": "{{ .InvolvedObject.Namespace }}"},
 	}
-	type args struct {
-		ctx context.Context
-		ev  *kube.EnhancedEvent
-	}
-	tests := []struct {
-		name      string
-		fields    fields
-		args      args
-		wantErr   bool
-		wantInput ssm.CreateOpsItemInput
-	}{
-		{"Simple Create", fields{
-			&OpsCenterConfig{
-				Title:           "{{ .Message }}",
-				Category:        "{{ .Reason }}",
-				Description:     "Event {{ .Reason }} for {{ .InvolvedObject.Namespace }}/{{ .InvolvedObject.Name }} on K8s cluster",
-				Notifications:   []string{"sns1", "sns2"},
-				OperationalData: map[string]string{"Reason": "{{ .Reason }}"},
-				Priority:        "6",
-				Region:          "us-east1",
-				RelatedOpsItems: []string{"ops1", "ops2"},
-				Severity:        "6",
-				Source:          "production",
-				Tags:            map[string]string{"ENV": "{{ .InvolvedObject.Namespace }}"},
-			},
-			m,
-		}, args{context.Background(), ev}, false,
-			ssm.CreateOpsItemInput{
-				Category:        new("my reason"),
-				Description:     new("Event my reason for prod/nginx-server-123abc-456def on K8s cluster"),
-				Notifications:   makeNotifications("sns1", "sns2"),
-				OperationalData: makeOperationalData(map[string]string{"Reason": "my reason"}),
-				Priority:        aws.Int64(6),
-				RelatedOpsItems: makeRelatedOpsItems("my reason"),
-				Severity:        new("6"),
-				Source:          new("production"),
-				Tags:            makeTags(map[string]string{"ENV": "prod"}),
-				Title:           new("Successfully pulled image \"nginx:latest\""),
-			},
-		},
-		{"Invalid Priority: Want err", fields{
-			&OpsCenterConfig{
-				Title:           "{{ .Message }}",
-				Category:        "{{ .Reason }}",
-				Description:     "Event {{ .Reason }} for {{ .InvolvedObject.Namespace }}/{{ .InvolvedObject.Name }} on K8s cluster",
-				Notifications:   []string{"sns1", "sns2"},
-				OperationalData: map[string]string{"Reason": "{{ .Reason }}"},
-				Priority:        "asdf",
-				Region:          "us-east1",
-				RelatedOpsItems: []string{"ops1", "ops2"},
-				Severity:        "6",
-				Source:          "production",
-				Tags:            map[string]string{"ENV": "{{ .InvolvedObject.Namespace }}"},
-			},
-			m,
-		}, args{context.Background(), ev}, true,
-			ssm.CreateOpsItemInput{},
+
+	client := &opsCenterClientMock{
+		createOpsItem: func(_ context.Context, input *ssm.CreateOpsItemInput) (*ssm.CreateOpsItemOutput, error) {
+			require.Equal(t, "Successfully pulled image \"nginx:latest\"", aws.ToString(input.Title))
+			require.Equal(t, "Event my reason for prod/nginx-server-123abc-456def on K8s cluster", aws.ToString(input.Description))
+			require.Equal(t, "production", aws.ToString(input.Source))
+			require.Equal(t, "my reason", aws.ToString(input.Category))
+			require.Equal(t, "6", aws.ToString(input.Severity))
+			require.EqualValues(t, 6, aws.ToInt32(input.Priority))
+
+			require.Len(t, input.Notifications, 2)
+			require.Equal(t, "sns1", aws.ToString(input.Notifications[0].Arn))
+			require.Equal(t, "sns2", aws.ToString(input.Notifications[1].Arn))
+
+			require.Contains(t, input.OperationalData, "Reason")
+			require.Equal(t, ssmtypes.OpsItemDataTypeSearchableString, input.OperationalData["Reason"].Type)
+			require.Equal(t, "my reason", aws.ToString(input.OperationalData["Reason"].Value))
+
+			require.Len(t, input.RelatedOpsItems, 2)
+			require.Equal(t, "ops1", aws.ToString(input.RelatedOpsItems[0].OpsItemId))
+			require.Equal(t, "ops2", aws.ToString(input.RelatedOpsItems[1].OpsItemId))
+
+			require.Len(t, input.Tags, 1)
+			require.Equal(t, "ENV", aws.ToString(input.Tags[0].Key))
+			require.Equal(t, "prod", aws.ToString(input.Tags[0].Value))
+			return &ssm.CreateOpsItemOutput{OpsItemId: aws.String("id123456")}, nil
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &OpsCenterSink{
-				cfg: tt.fields.cfg,
-				svc: tt.fields.svc,
-			}
-			if err := s.Send(tt.args.ctx, tt.args.ev); (err != nil) != tt.wantErr {
-				t.Errorf("OpsCenterSink.Send() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if !reflect.DeepEqual(m.Input, tt.wantInput) && tt.wantErr != true {
-				t.Errorf("OpsCenterSink.Send()  \nReturned:\n%v, \nWanted:\n %v", m.Input, tt.wantInput)
-			}
-		})
+
+	sink, err := newOpsCenterSinkWithClient(cfg, client)
+	require.NoError(t, err)
+	require.NoError(t, sink.Send(context.Background(), ev))
+}
+
+func TestOpsCenterSinkSendInvalidPriorityReturnsError(t *testing.T) {
+	cfg := &OpsCenterConfig{
+		Title:       "{{ .Message }}",
+		Description: "{{ .Message }}",
+		Priority:    "asdf",
+		Region:      "us-east1",
+		Source:      "production",
 	}
+	client := &opsCenterClientMock{}
+
+	sink, err := newOpsCenterSinkWithClient(cfg, client)
+	require.NoError(t, err)
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{})
+	require.Error(t, err)
 }
