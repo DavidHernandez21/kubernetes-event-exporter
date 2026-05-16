@@ -532,9 +532,19 @@ receivers:
       url: http://127.0.0.1:3100/loki/api/v1/push
 ```
 
-# Releasing
+## Releasing
 
 See [RELEASE.md](RELEASE.md) for the full release process and workflow details.
+
+**Release trigger limitations:**
+- The release workflow runs only on pushed Git tags.
+- It does not run on branch pushes, pull requests, manual dispatches, or nightly schedules.
+
+**Semver validation:**
+- Tags must be strict semver in the form `vMAJOR.MINOR.PATCH`.
+- Accepted example: `v1.2.3`
+- Rejected examples: `v1.2`, `1.2.3`, `v1.2.3-rc1`, `v1.2.3+build.1`
+- If a tag does not match this exact format, the workflow fails and no image is published.
 
 **Image path:**
 Images are published to GHCR under `ghcr.io/<owner>/<repo>`, for example:
