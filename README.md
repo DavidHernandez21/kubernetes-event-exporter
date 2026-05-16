@@ -541,9 +541,9 @@ See [RELEASE.md](RELEASE.md) for the full release process and workflow details.
 - It does not run on branch pushes, pull requests, manual dispatches, or nightly schedules.
 
 **Semver validation:**
-- Tags must be strict semver in the form `vMAJOR.MINOR.PATCH`.
+- Tags must be strict semver in the form `vMAJOR.MINOR.PATCH` with no leading zeros in any numeric part.
 - Accepted example: `v1.2.3`
-- Rejected examples: `v1.2`, `1.2.3`, `v1.2.3-rc1`, `v1.2.3+build.1`
+- Rejected examples: `v1.2`, `1.2.3`, `v01.02.003`, `v1.2.3-rc1`, `v1.2.3+build.1`
 - The tag trigger is intentionally broader (`v*.*.*`), but if a tag does not match this exact format, the workflow fails and no image is published.
 
 **Image path:**
