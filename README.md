@@ -531,3 +531,14 @@ receivers:
         foo: bar
       url: http://127.0.0.1:3100/loki/api/v1/push
 ```
+
+# Releasing
+
+See [RELEASE.md](RELEASE.md) for the full release process and workflow details.
+
+**Image path:**
+Images are published to GHCR under `ghcr.io/<owner>/<repo>`, for example:
+
+   ghcr.io/davidhernandez21/kubernetes-event-exporter
+
+where `<owner>` is your GitHub username or organization, and `<repo>` is the repository name.
