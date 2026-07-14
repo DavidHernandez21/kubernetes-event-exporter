@@ -75,10 +75,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Build
@@ -103,10 +103,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Test SQS integration
@@ -128,10 +128,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Test SNS integration
@@ -153,10 +153,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Test Firehose integration
@@ -178,10 +178,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Test EventBridge integration
@@ -203,10 +203,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Test Kinesis integration
@@ -228,10 +228,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up Go 1.26.4
+      - name: Set up Go 1.26.5
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.4"
+          go-version: "1.26.5"
         id: go
 
       - name: Test OpsCenter integration
