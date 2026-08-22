@@ -64,8 +64,8 @@ func TestEmptyRoute(t *testing.T) {
 }
 
 func TestBasicRoute(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -80,8 +80,8 @@ func TestBasicRoute(t *testing.T) {
 }
 
 func TestDropRule(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -99,8 +99,8 @@ func TestDropRule(t *testing.T) {
 }
 
 func TestSingleLevelMultipleMatchRoute(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -118,8 +118,8 @@ func TestSingleLevelMultipleMatchRoute(t *testing.T) {
 }
 
 func TestSubRoute(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -139,8 +139,8 @@ func TestSubRoute(t *testing.T) {
 }
 
 func TestSubSubRoute(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -166,8 +166,8 @@ func TestSubSubRoute(t *testing.T) {
 }
 
 func TestSubSubRouteWithDrop(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -197,13 +197,13 @@ func TestSubSubRouteWithDrop(t *testing.T) {
 
 // Test for issue: https://github.com/DavidHernandez21/kubernetes-event-exporter/issues/51
 func Test_GHIssue51(t *testing.T) {
-	ev1 := kube.EnhancedEvent{}
-	ev1.Type = "Warning"
-	ev1.Reason = "FailedCreatePodContainer"
+	ev1 := kube.EnhancedEvent{
+		Type:   "Warning",
+		Reason: "FailedCreatePodContainer"}
 
-	ev2 := kube.EnhancedEvent{}
-	ev2.Type = "Warning"
-	ev2.Reason = "FailedCreate"
+	ev2 := kube.EnhancedEvent{
+		Type:   "Warning",
+		Reason: "FailedCreate"}
 
 	reg := testReceiverRegistry{}
 
@@ -234,8 +234,8 @@ func mustCompileRule(t testing.TB, rule Rule) Rule {
 }
 
 func TestBasicRoutePattern(t *testing.T) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 	reg := testReceiverRegistry{}
 
 	r := Route{
@@ -259,8 +259,8 @@ func TestBasicRoutePattern(t *testing.T) {
 }
 
 func BenchmarkMatchesEvent_WithPrecompile(b *testing.B) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 
 	rule := mustCompileRule(b, Rule{
 		Namespace: "kube-.*",
@@ -272,8 +272,8 @@ func BenchmarkMatchesEvent_WithPrecompile(b *testing.B) {
 }
 
 func BenchmarkMatchesEvent_WithoutPrecompile(b *testing.B) {
-	ev := kube.EnhancedEvent{}
-	ev.Namespace = "kube-system"
+	ev := kube.EnhancedEvent{
+		Namespace: "kube-system"}
 
 	rule := Rule{
 		Namespace: "kube-.*",

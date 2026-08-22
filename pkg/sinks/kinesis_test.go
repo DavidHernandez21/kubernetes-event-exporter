@@ -9,8 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -27,10 +25,9 @@ func (m *kinesisClientMock) PutRecord(ctx context.Context, input *kinesis.PutRec
 }
 
 func TestKinesisSinkSendPublishesRecord(t *testing.T) {
-	ev := &kube.EnhancedEvent{Event: corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{UID: types.UID("uid-1")},
-		Message:    "hello",
-	}}
+	ev := &kube.EnhancedEvent{
+		UID:     types.UID("uid-1"),
+		Message: "hello"}
 	cfg := &KinesisConfig{StreamName: "kube-events", Region: "us-east-1"}
 	client := &kinesisClientMock{
 		putRecord: func(_ context.Context, input *kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error) {
@@ -65,7 +62,7 @@ func TestKinesisSinkSendTemplateError(t *testing.T) {
 
 	sink, err := newKinesisSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.Error(t, err)
 	require.False(t, putCalled)
 }
@@ -81,6 +78,6 @@ func TestKinesisSinkSendPropagatesError(t *testing.T) {
 
 	sink, err := newKinesisSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.ErrorIs(t, err, putErr)
 }

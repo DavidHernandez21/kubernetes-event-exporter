@@ -64,8 +64,8 @@ func (s *SlackSink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
 		})
 
 		// make slack attachment
-		slackAttachment := slack.Attachment{}
-		slackAttachment.Fields = fields
+		slackAttachment := slack.Attachment{
+			Fields: fields}
 		if s.cfg.AuthorName != "" {
 			slackAttachment.AuthorName, err = GetString(ev, s.cfg.AuthorName)
 			if err != nil {

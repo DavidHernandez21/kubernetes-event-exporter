@@ -23,9 +23,9 @@ type OpsCenterConfig struct {
 	Severity        string            `yaml:"severity"`
 	Source          string            `yaml:"source"`
 	Title           string            `yaml:"title"`
+	Endpoint        string            `yaml:"endpoint"`
 	Notifications   []string          `yaml:"notifications"`
 	RelatedOpsItems []string          `yaml:"relatedOpsItems"`
-	Endpoint        string            `yaml:"endpoint"`
 }
 
 // OpsCenterSink is an AWS OpsCenter notifcation path.

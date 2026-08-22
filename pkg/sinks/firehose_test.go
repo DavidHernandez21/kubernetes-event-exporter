@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/firehose"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type firehoseClientMock struct {
@@ -25,7 +24,7 @@ func (m *firehoseClientMock) PutRecord(ctx context.Context, input *firehose.PutR
 }
 
 func TestFirehoseSinkSendPublishesRecord(t *testing.T) {
-	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}}
+	ev := &kube.EnhancedEvent{Message: "hello"}
 	cfg := &FirehoseConfig{DeliveryStreamName: "kube-events", Region: "us-east-1"}
 	client := &firehoseClientMock{
 		putRecord: func(_ context.Context, input *firehose.PutRecordInput) (*firehose.PutRecordOutput, error) {
@@ -59,7 +58,7 @@ func TestFirehoseSinkSendTemplateError(t *testing.T) {
 
 	sink, err := newFirehoseSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.Error(t, err)
 	require.False(t, putCalled)
 }
@@ -75,6 +74,6 @@ func TestFirehoseSinkSendPropagatesError(t *testing.T) {
 
 	sink, err := newFirehoseSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.ErrorIs(t, err, putErr)
 }
