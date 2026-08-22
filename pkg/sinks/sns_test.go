@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type snsClientMock struct {
@@ -24,7 +23,7 @@ func (m *snsClientMock) Publish(ctx context.Context, input *sns.PublishInput, _ 
 }
 
 func TestSNSSinkSendPublishesMessage(t *testing.T) {
-	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}}
+	ev := &kube.EnhancedEvent{Message: "hello"}
 	cfg := &SNSConfig{TopicARN: "arn:aws:sns:us-east-1:000000000000:kube-events", Region: "us-east-1"}
 	client := &snsClientMock{
 		publish: func(_ context.Context, input *sns.PublishInput) (*sns.PublishOutput, error) {
@@ -58,7 +57,7 @@ func TestSNSSinkSendTemplateError(t *testing.T) {
 
 	sink, err := newSNSSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.Error(t, err)
 	require.False(t, publishCalled)
 }
@@ -74,6 +73,6 @@ func TestSNSSinkSendPropagatesError(t *testing.T) {
 
 	sink, err := newSNSSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.ErrorIs(t, err, publishErr)
 }

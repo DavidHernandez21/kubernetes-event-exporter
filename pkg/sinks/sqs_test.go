@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type sqsClientMock struct {
@@ -46,7 +45,7 @@ func TestNewSQSSinkResolvesQueueURL(t *testing.T) {
 
 func TestSQSSinkSendPublishesMessage(t *testing.T) {
 	cfg := &SQSConfig{QueueName: "events", Region: "us-east-1"}
-	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}}
+	ev := &kube.EnhancedEvent{Message: "hello"}
 	client := &sqsClientMock{}
 	client.getQueueUrl = func(_ context.Context, _ *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
 		return &sqs.GetQueueUrlOutput{QueueUrl: aws.String("http://queue-url")}, nil
@@ -82,7 +81,7 @@ func TestSQSSinkSendTemplateError(t *testing.T) {
 
 	sink, err := newSQSSinkWithClient(context.Background(), cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.Error(t, err)
 	require.False(t, sendCalled)
 }
@@ -100,6 +99,6 @@ func TestSQSSinkSendPropagatesError(t *testing.T) {
 
 	sink, err := newSQSSinkWithClient(context.Background(), cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.ErrorIs(t, err, sendErr)
 }

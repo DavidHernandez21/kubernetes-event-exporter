@@ -2,19 +2,20 @@ package sinks
 
 import (
 	"bufio"
-	"cloud.google.com/go/bigquery"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/batch"
-	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
-	"github.com/rs/zerolog/log"
-	"google.golang.org/api/option"
 	"math/rand"
 	"os"
 	"time"
 	"unicode"
+
+	"cloud.google.com/go/bigquery"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/batch"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
+	"github.com/rs/zerolog/log"
+	"google.golang.org/api/option"
 )
 
 // Returns a map filtering out keys that have nil value assigned.
@@ -61,7 +62,7 @@ func bigQuerySanitizeKeys(x map[string]any) map[string]any {
 	return y
 }
 
-func bigQueryWriteBatchToJsonFile(items []any, path string) error {
+func bigQueryWriteBatchToJsonFile(items []*kube.EnhancedEvent, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -70,7 +71,7 @@ func bigQueryWriteBatchToJsonFile(items []any, path string) error {
 
 	writer := bufio.NewWriter(file)
 	for i := range items {
-		event := items[i].(*kube.EnhancedEvent)
+		event := items[i]
 		var mapStruct map[string]any
 		json.Unmarshal(event.ToJSON(), &mapStruct)
 		jsonBytes, _ := json.Marshal(bigQuerySanitizeKeys(bigQueryDropNils(mapStruct)))
@@ -182,7 +183,7 @@ func NewBigQuerySink(cfg *BigQueryConfig) (*BigQuerySink, error) {
 	}
 
 	rand.Seed(time.Now().UTC().UnixNano())
-	handleBatch := func(ctx context.Context, items []any) []bool {
+	handleBatch := func(ctx context.Context, items []*kube.EnhancedEvent) []bool {
 		res := make([]bool, len(items))
 		for i := range items {
 			res[i] = true
@@ -221,7 +222,7 @@ func NewBigQuerySink(cfg *BigQueryConfig) (*BigQuerySink, error) {
 }
 
 type BigQuerySink struct {
-	batchWriter *batch.Writer
+	batchWriter *batch.Writer[*kube.EnhancedEvent]
 }
 
 func (e *BigQuerySink) Send(ctx context.Context, ev *kube.EnhancedEvent) error {

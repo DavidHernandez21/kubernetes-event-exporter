@@ -10,7 +10,6 @@ import (
 	eventbridge "github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type eventbridgeClientMock struct {
@@ -26,7 +25,7 @@ func (m *eventbridgeClientMock) PutEvents(ctx context.Context, input *eventbridg
 }
 
 func TestEventBridgeSinkSendPublishesEvent(t *testing.T) {
-	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}}
+	ev := &kube.EnhancedEvent{Message: "hello"}
 	cfg := &EventBridgeConfig{
 		DetailType:   "deployment",
 		Source:       "cd",
@@ -73,7 +72,7 @@ func TestEventBridgeSinkSendTemplateError(t *testing.T) {
 
 	sink, err := newEventBridgeSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.Error(t, err)
 	require.False(t, putCalled)
 }
@@ -94,6 +93,6 @@ func TestEventBridgeSinkSendPropagatesError(t *testing.T) {
 
 	sink, err := newEventBridgeSinkWithClient(cfg, client)
 	require.NoError(t, err)
-	err = sink.Send(context.Background(), &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}})
+	err = sink.Send(context.Background(), &kube.EnhancedEvent{Message: "hello"})
 	require.ErrorIs(t, err, putErr)
 }

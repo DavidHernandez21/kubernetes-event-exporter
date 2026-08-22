@@ -9,7 +9,6 @@ import (
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type publishResultMock struct {
@@ -126,7 +125,7 @@ func TestNewPubsubSinkWithClientCreateTopicErrorClosesClient(t *testing.T) {
 }
 
 func TestPubsubSinkSendPublishesMessage(t *testing.T) {
-	ev := &kube.EnhancedEvent{Event: corev1.Event{Message: "hello"}}
+	ev := &kube.EnhancedEvent{Message: "hello"}
 	publishedData := []byte(nil)
 	sink := &PubsubSink{
 		publisher: &publisherMock{

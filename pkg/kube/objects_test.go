@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -112,10 +113,10 @@ func TestGetObjectMetadata_CacheKeyUsesUIDOnly(t *testing.T) {
 	defer metrics.DestroyMetricsStore(metricsStore)
 
 	provider, cs, dyn, ref := newMetadataTestEnv(t, 10*time.Second)
-	var getCalls int32
+	var getCalls atomic.Int32
 
 	dyn.Fake.PrependReactor("get", "deployments", func(action k8stesting.Action) (bool, runtime.Object, error) {
-		atomic.AddInt32(&getCalls, 1)
+		getCalls.Add(1)
 		return false, nil, nil
 	})
 
@@ -126,28 +127,30 @@ func TestGetObjectMetadata_CacheKeyUsesUIDOnly(t *testing.T) {
 	_, err = provider.getObjectMetadata(ref, cs, dyn, metricsStore)
 	require.NoError(t, err)
 
-	assert.Equal(t, int32(1), atomic.LoadInt32(&getCalls), "expected cache hit when only ResourceVersion changed")
+	assert.Equal(t, int32(1), getCalls.Load(), "expected cache hit when only ResourceVersion changed")
 }
 
 func TestGetObjectMetadata_TTLExpiryTriggersRefresh(t *testing.T) {
-	metricsStore := metrics.NewMetricsStore("test_")
-	defer metrics.DestroyMetricsStore(metricsStore)
+	synctest.Test(t, func(t *testing.T) {
+		metricsStore := metrics.NewMetricsStore("test_")
+		defer metrics.DestroyMetricsStore(metricsStore)
 
-	provider, cs, dyn, ref := newMetadataTestEnv(t, 20*time.Millisecond)
-	var getCalls int32
+		provider, cs, dyn, ref := newMetadataTestEnv(t, 20*time.Millisecond)
+		var getCalls atomic.Int32
 
-	dyn.Fake.PrependReactor("get", "deployments", func(action k8stesting.Action) (bool, runtime.Object, error) {
-		atomic.AddInt32(&getCalls, 1)
-		return false, nil, nil
+		dyn.Fake.PrependReactor("get", "deployments", func(action k8stesting.Action) (bool, runtime.Object, error) {
+			getCalls.Add(1)
+			return false, nil, nil
+		})
+
+		_, err := provider.getObjectMetadata(ref, cs, dyn, metricsStore)
+		require.NoError(t, err)
+
+		synctest.Sleep(50 * time.Millisecond)
+
+		_, err = provider.getObjectMetadata(ref, cs, dyn, metricsStore)
+		require.NoError(t, err)
+
+		assert.Equal(t, int32(2), getCalls.Load(), "expected cache refresh after TTL expiry")
 	})
-
-	_, err := provider.getObjectMetadata(ref, cs, dyn, metricsStore)
-	require.NoError(t, err)
-
-	time.Sleep(50 * time.Millisecond)
-
-	_, err = provider.getObjectMetadata(ref, cs, dyn, metricsStore)
-	require.NoError(t, err)
-
-	assert.Equal(t, int32(2), atomic.LoadInt32(&getCalls), "expected cache refresh after TTL expiry")
 }

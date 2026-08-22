@@ -9,22 +9,22 @@ import (
 // reached. There will also be support for concurrency for high volume. The handler function is supposed to return an
 // array of booleans to indicate whether the transfer was successful or not. It can be replaced with status codes in
 // the future to differentiate I/O errors, rate limiting, authorization issues.
-type Writer struct {
-	Handler  Callback
+type Writer[T any] struct {
+	Handler  Callback[T]
 	done     chan bool
 	stopDone chan bool
-	items    chan any
-	buffer   []bufferItem
+	items    chan T
+	buffer   []bufferItem[T]
 	cfg      WriterConfig
 	len      int
 }
 
-type bufferItem struct {
-	v       any
+type bufferItem[T any] struct {
+	v       T
 	attempt int
 }
 
-type Callback func(ctx context.Context, items []any) []bool
+type Callback[T any] func(ctx context.Context, items []T) []bool
 
 type WriterConfig struct {
 	BatchSize  int
@@ -33,18 +33,18 @@ type WriterConfig struct {
 	Timeout    time.Duration
 }
 
-func NewWriter(cfg WriterConfig, cb Callback) *Writer {
-	return &Writer{
+func NewWriter[T any](cfg WriterConfig, cb Callback[T]) *Writer[T] {
+	return &Writer[T]{
 		cfg:     cfg,
 		Handler: cb,
-		buffer:  make([]bufferItem, cfg.BatchSize),
+		buffer:  make([]bufferItem[T], cfg.BatchSize),
 	}
 }
 
 // Indicates the start to accept the
-func (w *Writer) Start() {
+func (w *Writer[T]) Start() {
 	w.done = make(chan bool)
-	w.items = make(chan any)
+	w.items = make(chan T)
 	w.stopDone = make(chan bool)
 	ticker := time.NewTicker(w.cfg.Interval)
 
@@ -58,7 +58,7 @@ func (w *Writer) Start() {
 					w.len = 0
 				}
 
-				w.buffer[w.len] = bufferItem{v: item, attempt: 0}
+				w.buffer[w.len] = bufferItem[T]{v: item, attempt: 0}
 				w.len++
 			case <-w.done:
 				w.processBuffer(context.Background())
@@ -72,13 +72,13 @@ func (w *Writer) Start() {
 	}()
 }
 
-func (w *Writer) processBuffer(ctx context.Context) {
+func (w *Writer[T]) processBuffer(ctx context.Context) {
 	if w.len == 0 {
 		return
 	}
 
 	// Need to copy the underlying item to another slice
-	slice := make([]any, w.len)
+	slice := make([]T, w.len)
 	for i := 0; i < w.len; i++ {
 		slice[i] = w.buffer[i].v
 	}
@@ -97,7 +97,7 @@ func (w *Writer) processBuffer(ctx context.Context) {
 				continue
 			}
 
-			w.buffer[newItemsCount] = bufferItem{
+			w.buffer[newItemsCount] = bufferItem[T]{
 				v:       item.v,
 				attempt: item.attempt + 1,
 			}
@@ -111,13 +111,13 @@ func (w *Writer) processBuffer(ctx context.Context) {
 }
 
 // Used to signal writer to stop processing items and exit.
-func (w *Writer) Stop() {
+func (w *Writer[T]) Stop() {
 	w.done <- true
 	<-w.stopDone
 }
 
 // Submit pushes the items to the income buffer and they are placed onto the actual buffer from there.
-func (w *Writer) Submit(items ...any) {
+func (w *Writer[T]) Submit(items ...T) {
 	for _, item := range items {
 		w.items <- item
 	}

@@ -201,7 +201,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndAfterMaxAge(t *tes
 	startup := time.Now().Add(-10 * time.Minute)
 	ew.setStartUpTime(startup)
 	event1 := corev1.Event{
-		ObjectMeta:    metav1.ObjectMeta{Name: "event1"},
+		Name:          "event1",
 		LastTimestamp: metav1.Time{Time: startup.Add(3 * time.Minute)},
 	}
 	assert.True(t, ew.isEventDiscarded(&event1))
@@ -213,8 +213,8 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndAfterMaxAge(t *tes
 
 	// event is 3m after stratup time (and 2m after max age) -> expect dropped with warn
 	event2 := corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Name: "event2"},
-		EventTime:  metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
+		Name:      "event2",
+		EventTime: metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
 	}
 
 	assert.True(t, ew.isEventDiscarded(&event2))
@@ -226,7 +226,7 @@ func TestEventWatcher_EventAge_whenEventCreatedAfterStartupAndAfterMaxAge(t *tes
 
 	// event is 3m after stratup time (and 2m after max age) -> expect dropped with warn
 	event3 := corev1.Event{
-		ObjectMeta:    metav1.ObjectMeta{Name: "event3"},
+		Name:          "event3",
 		LastTimestamp: metav1.Time{Time: startup.Add(3 * time.Minute)},
 		EventTime:     metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
 	}
@@ -253,7 +253,7 @@ func TestEventWatcher_EventAge_whenSeriesLastObservedTimeWithinMaxAge(t *testing
 	ew.setStartUpTime(startup)
 
 	event := corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Name: "event-series-recent"},
+		Name: "event-series-recent",
 		Series: &corev1.EventSeries{
 			LastObservedTime: metav1.MicroTime{Time: startup.Add(8 * time.Minute)},
 		},
@@ -279,7 +279,7 @@ func TestEventWatcher_EventAge_whenSeriesLastObservedTimeAfterMaxAge(t *testing.
 	ew.setStartUpTime(startup)
 
 	event := corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Name: "event-series-old"},
+		Name: "event-series-old",
 		Series: &corev1.EventSeries{
 			LastObservedTime: metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
 		},
@@ -307,7 +307,7 @@ func TestEventWatcher_EventAge_whenSeriesWithoutLastObservedTimeFallsBack(t *tes
 	ew.setStartUpTime(startup)
 
 	event := corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Name: "event-series-zero"},
+		Name: "event-series-zero",
 		Series: &corev1.EventSeries{
 			LastObservedTime: metav1.MicroTime{},
 		},
@@ -333,7 +333,7 @@ func TestOnEvent_WithObjectMetadata(t *testing.T) {
 	startup := time.Now().Add(-10 * time.Minute)
 	ew.setStartUpTime(startup)
 	event1 := corev1.Event{
-		ObjectMeta:    metav1.ObjectMeta{Name: "event1"},
+		Name:          "event1",
 		LastTimestamp: metav1.Time{Time: startup.Add(8 * time.Minute)},
 		InvolvedObject: corev1.ObjectReference{
 			UID:  "test",
@@ -370,7 +370,7 @@ func TestOnEvent_DeletedObjects(t *testing.T) {
 	startup := time.Now().Add(-10 * time.Minute)
 	ew.setStartUpTime(startup)
 	event1 := corev1.Event{
-		ObjectMeta:    metav1.ObjectMeta{Name: "event1"},
+		Name:          "event1",
 		LastTimestamp: metav1.Time{Time: startup.Add(8 * time.Minute)},
 		InvolvedObject: corev1.ObjectReference{
 			UID:  "test",
@@ -403,7 +403,7 @@ func TestEventWatcher_OnUpdate_ProcessesEvent(t *testing.T) {
 	startup := time.Now().Add(-10 * time.Minute)
 	ew.setStartUpTime(startup)
 	newEvent := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Name: "event-update"},
+		Name: "event-update",
 		InvolvedObject: corev1.ObjectReference{
 			UID:  "test",
 			Name: "test-1",
@@ -432,7 +432,7 @@ func TestEventWatcher_OnUpdate_DiscardsOldEvent(t *testing.T) {
 	startup := time.Now().Add(-10 * time.Minute)
 	ew.setStartUpTime(startup)
 	newEvent := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{Name: "event-too-old"},
+		Name: "event-too-old",
 		// 7 minutes (-10 + 3) after startup, beyond the 5 minute max age
 		EventTime: metav1.MicroTime{Time: startup.Add(3 * time.Minute)},
 	}

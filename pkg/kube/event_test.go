@@ -74,26 +74,18 @@ func TestEnhancedEvent_DeDot(t *testing.T) {
 
 func TestEnhancedEvent_DeDot_MustNotAlternateOriginal(t *testing.T) {
 	expected := EnhancedEvent{
-		Event: corev1.Event{
-			Message: "foovar",
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{"test.io": "bar"},
-				Labels:      map[string]string{"faz.net": "var"},
-			},
-		},
+		Message:     "foovar",
+		Annotations: map[string]string{"test.io": "bar"},
+		Labels:      map[string]string{"faz.net": "var"},
 		InvolvedObject: EnhancedObjectReference{
 			Annotations: map[string]string{"test.io": "bar"},
 			Labels:      map[string]string{"faz.net": "var"},
 		},
 	}
 	in := EnhancedEvent{
-		Event: corev1.Event{
-			Message: "foovar",
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{"test.io": "bar"},
-				Labels:      map[string]string{"faz.net": "var"},
-			},
-		},
+		Message:     "foovar",
+		Annotations: map[string]string{"test.io": "bar"},
+		Labels:      map[string]string{"faz.net": "var"},
 		InvolvedObject: EnhancedObjectReference{
 			Annotations: map[string]string{"test.io": "bar"},
 			Labels:      map[string]string{"faz.net": "var"},
