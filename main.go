@@ -28,8 +28,12 @@ var (
 	enablePprof = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 )
 
-//nolint:gocyclo
 func main() {
+	os.Exit(run())
+}
+
+//nolint:gocyclo
+func run() int {
 	flag.Parse()
 
 	log.Info().Msg("Reading config file " + *conf)
@@ -123,7 +127,8 @@ func main() {
 
 	kubecfg, err := kube.GetKubernetesConfig(*kubeconfig)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get kubeconfig")
+		log.Error().Err(err).Msg("cannot get kubeconfig")
+		return 1
 	}
 	kubecfg.QPS = cfg.KubeQPS
 	kubecfg.Burst = cfg.KubeBurst
@@ -153,7 +158,8 @@ func main() {
 		kube.WithOmitLookup(cfg.OmitLookup),
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot create EventWatcherRequired")
+		log.Error().Err(err).Msg("cannot create EventWatcherRequired")
+		return 1
 	}
 
 	w, err := kube.NewEventWatcher(kubecfg, eventWatcherRequired)
@@ -162,7 +168,7 @@ func main() {
 		log.Error().Err(err).Msg("failed to create event watcher")
 		engine.Stop()
 		metrics.DestroyMetricsStore(metricsStore)
-		os.Exit(1)
+		return 1
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -202,7 +208,7 @@ func main() {
 			cancel()
 			w.Stop()
 			engine.Stop()
-			return
+			return 1
 		}
 
 		// Run returns if either the context is canceled or client stopped holding the leader lease
@@ -226,4 +232,5 @@ func main() {
 	log.Info().Msg("Received signal to exit. Stopping.")
 	w.Stop()
 	engine.Stop()
+	return 0
 }

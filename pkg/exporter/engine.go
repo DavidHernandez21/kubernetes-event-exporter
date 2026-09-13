@@ -94,7 +94,7 @@ func eventAttributes(event *kube.EnhancedEvent) []attribute.KeyValue {
 	return attributes
 }
 
-func truncateTraceMessage(message string) (string, int, bool) {
+func truncateTraceMessage(message string) (truncated string, length int, wasTruncated bool) {
 	runes := []rune(message)
 	if len(runes) <= maxTraceMessageRunes {
 		return message, len(runes), false

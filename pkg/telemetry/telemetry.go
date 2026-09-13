@@ -62,7 +62,7 @@ func Initialize(ctx context.Context) (func(context.Context) error, error) {
 	return provider.Shutdown, nil
 }
 
-func normalizeEndpoint(endpoint string) (string, bool, error) {
+func normalizeEndpoint(endpoint string) (normalized string, insecure bool, err error) {
 	if !strings.Contains(endpoint, "://") {
 		return endpoint, true, nil
 	}
