@@ -1,6 +1,10 @@
 package exporter
 
-import "github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
+import (
+	"context"
+
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
+)
 
 type Router struct {
 	cfg  *Config
@@ -8,5 +12,5 @@ type Router struct {
 }
 
 func (r *Router) ProcessEvent(event *kube.EnhancedEvent) {
-	r.cfg.Route.ProcessEvent(event, r.rcvr)
+	r.cfg.Route.ProcessEvent(context.Background(), event, r.rcvr)
 }

@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"bytes"
+	"context"
 	"slices"
 
 	"testing"
@@ -21,7 +22,7 @@ func (t *testReceiverRegistry) Register(string, sinks.Sink) {
 	panic("Why do you call this? It's for counting imaginary events for tests only")
 }
 
-func (t *testReceiverRegistry) SendEvent(name string, event *kube.EnhancedEvent) {
+func (t *testReceiverRegistry) SendEvent(_ context.Context, name string, event *kube.EnhancedEvent) {
 	if t.rcvd == nil {
 		t.rcvd = make(map[string][]*kube.EnhancedEvent)
 	}
@@ -59,7 +60,7 @@ func TestEmptyRoute(t *testing.T) {
 
 	r := Route{}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 	assert.Empty(t, reg.rcvd)
 }
 
@@ -75,7 +76,7 @@ func TestBasicRoute(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 	assert.True(t, reg.isEventRcvd("osman", &ev))
 }
 
@@ -93,7 +94,7 @@ func TestDropRule(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 	assert.False(t, reg.isEventRcvd("osman", &ev))
 	assert.Zero(t, reg.count("osman"))
 }
@@ -112,7 +113,7 @@ func TestSingleLevelMultipleMatchRoute(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 	assert.True(t, reg.isEventRcvd("osman", &ev))
 	assert.True(t, reg.isEventRcvd("any", &ev))
 }
@@ -133,7 +134,7 @@ func TestSubRoute(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 
 	assert.True(t, reg.isEventRcvd("osman", &ev))
 }
@@ -159,7 +160,7 @@ func TestSubSubRoute(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 
 	assert.True(t, reg.isEventRcvd("osman", &ev))
 	assert.True(t, reg.isEventRcvd("any", &ev))
@@ -189,7 +190,7 @@ func TestSubSubRouteWithDrop(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 
 	assert.True(t, reg.isEventRcvd("osman", &ev))
 	assert.False(t, reg.isEventRcvd("any", &ev))
@@ -217,8 +218,8 @@ func Test_GHIssue51(t *testing.T) {
 		}},
 	}
 
-	r.ProcessEvent(&ev1, &reg)
-	r.ProcessEvent(&ev2, &reg)
+	r.ProcessEvent(context.Background(), &ev1, &reg)
+	r.ProcessEvent(context.Background(), &ev2, &reg)
 
 	assert.True(t, reg.isEventRcvd("elastic", &ev1))
 	assert.False(t, reg.isEventRcvd("elastic", &ev2))
@@ -249,7 +250,7 @@ func TestBasicRoutePattern(t *testing.T) {
 	assert.NotNil(t, r.Match[0].namespacePattern)
 	assert.NotNil(t, r.Match[0].receiverPattern)
 
-	r.ProcessEvent(&ev, &reg)
+	r.ProcessEvent(context.Background(), &ev, &reg)
 	assert.True(t, reg.isEventRcvd("osman", &ev))
 
 	output := &bytes.Buffer{}

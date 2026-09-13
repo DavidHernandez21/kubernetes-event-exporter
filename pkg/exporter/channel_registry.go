@@ -2,13 +2,20 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/sinks"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var sinkTracer = otel.Tracer("github.com/DavidHernandez21/kubernetes-event-exporter/pkg/exporter")
 
 // ChannelBasedReceiverRegistry creates two channels for each receiver. One is for receiving events and other one is
 // for breaking out of the infinite loop. Each message is passed to receivers
@@ -16,30 +23,30 @@ import (
 // and we might need a mechanism to drop the vents
 // On closing, the registry sends a signal on all exit channels, and then waits for all to complete.
 type ChannelBasedReceiverRegistry struct {
-	ch           map[string]chan kube.EnhancedEvent
+	ch           map[string]chan Delivery
 	exitCh       map[string]chan struct{}
 	wg           *sync.WaitGroup
 	MetricsStore *metrics.Store
 }
 
-func (r *ChannelBasedReceiverRegistry) SendEvent(name string, event *kube.EnhancedEvent) {
+func (r *ChannelBasedReceiverRegistry) SendEvent(ctx context.Context, name string, event *kube.EnhancedEvent) {
 	ch := r.ch[name]
 	if ch == nil {
 		log.Error().Str("name", name).Msg("There is no channel")
 	}
 
 	go func() {
-		ch <- *event
+		ch <- Delivery{Ctx: ctx, Event: *event}
 	}()
 }
 
 func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink) {
 	if r.ch == nil {
-		r.ch = make(map[string]chan kube.EnhancedEvent)
+		r.ch = make(map[string]chan Delivery)
 		r.exitCh = make(map[string]chan struct{})
 	}
 
-	ch := make(chan kube.EnhancedEvent)
+	ch := make(chan Delivery)
 	exitCh := make(chan struct{})
 
 	r.ch[name] = ch
@@ -53,13 +60,19 @@ func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink
 	Loop:
 		for {
 			select {
-			case ev := <-ch:
-				log.Debug().Str("sink", name).Str("event", ev.Message).Msg("sending event to sink")
-				err := receiver.Send(context.Background(), &ev)
+			case delivery := <-ch:
+				log.Debug().Str("sink", name).Str("event", delivery.Event.Message).Msg("sending event to sink")
+				ctx, span := sinkTracer.Start(delivery.Ctx, "kubernetes.event.sink", trace.WithSpanKind(trace.SpanKindProducer))
+				span.SetAttributes(attribute.String("k8s.event.receiver", name))
+				err := receiver.Send(ctx, &delivery.Event)
 				if err != nil {
-					r.MetricsStore.SendErrors.Inc()
-					log.Debug().Err(err).Str("sink", name).Str("event", ev.Message).Msg("Cannot send event")
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "sink delivery failed")
+					span.AddEvent("sink.delivery.error", trace.WithAttributes(attribute.String("error.type", fmt.Sprintf("%T", err))))
+					metrics.IncWithTrace(ctx, r.MetricsStore.SendErrors)
+					log.Debug().Err(err).Str("sink", name).Str("event", delivery.Event.Message).Msg("Cannot send event")
 				}
+				span.End()
 			case <-exitCh:
 				log.Info().Str("sink", name).Msg("Closing the sink")
 				break Loop

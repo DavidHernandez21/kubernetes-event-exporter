@@ -15,6 +15,7 @@ import (
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/metrics"
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/setup"
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/telemetry"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -107,6 +108,18 @@ func main() {
 	if err := cfg.Validate(); err != nil {
 		log.Fatal().Err(err).Msg("config validation failed")
 	}
+
+	shutdownTelemetry, err := telemetry.Initialize(context.Background())
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot initialize OpenTelemetry")
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(shutdownCtx); err != nil {
+			log.Error().Err(err).Msg("failed to flush OpenTelemetry spans")
+		}
+	}()
 
 	kubecfg, err := kube.GetKubernetesConfig(*kubeconfig)
 	if err != nil {
