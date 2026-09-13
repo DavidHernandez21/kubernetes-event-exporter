@@ -1,6 +1,10 @@
 package exporter
 
-import "github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
+import (
+	"context"
+
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
+)
 
 // Route allows using rules to drop events or match events to specific receivers.
 // It also allows using routes recursively for complex route building to fit
@@ -11,7 +15,7 @@ type Route struct {
 	Routes []Route
 }
 
-func (r *Route) ProcessEvent(ev *kube.EnhancedEvent, registry ReceiverRegistry) {
+func (r *Route) ProcessEvent(ctx context.Context, ev *kube.EnhancedEvent, registry ReceiverRegistry) {
 	// First determine whether we will drop the event: If any of the drop is matched, we break the loop
 	for i := range r.Drop {
 		v := &r.Drop[i]
@@ -26,7 +30,7 @@ func (r *Route) ProcessEvent(ev *kube.EnhancedEvent, registry ReceiverRegistry) 
 		rule := &r.Match[i]
 		if rule.MatchesEvent(ev) {
 			if rule.Receiver != "" {
-				registry.SendEvent(rule.Receiver, ev)
+				registry.SendEvent(ctx, rule.Receiver, ev)
 				// Send the event down the hole
 			}
 		} else {
@@ -37,7 +41,7 @@ func (r *Route) ProcessEvent(ev *kube.EnhancedEvent, registry ReceiverRegistry) 
 	// If all matches are satisfied, we can send them down to the rabbit hole
 	if matchesAll {
 		for _, subRoute := range r.Routes {
-			subRoute.ProcessEvent(ev, registry)
+			subRoute.ProcessEvent(ctx, ev, registry)
 		}
 	}
 }

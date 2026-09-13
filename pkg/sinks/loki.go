@@ -13,6 +13,7 @@ import (
 
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type promtailStream struct {
@@ -50,7 +51,7 @@ func NewLoki(cfg *LokiConfig) (Sink, error) {
 	}
 
 	client := &http.Client{
-		Transport: transport,
+		Transport: otelhttp.NewTransport(transport),
 		Timeout:   10 * time.Second,
 	}
 

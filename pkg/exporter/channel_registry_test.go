@@ -11,10 +11,12 @@ import (
 
 type channelRegistrySinkStub struct {
 	sent   *kube.EnhancedEvent
+	ctx    context.Context
 	closed bool
 }
 
 func (s *channelRegistrySinkStub) Send(ctx context.Context, ev *kube.EnhancedEvent) error {
+	s.ctx = ctx
 	s.sent = evClone(ev)
 	return nil
 }
@@ -35,7 +37,7 @@ func TestChannelBasedReceiverRegistrySendAndClose(t *testing.T) {
 
 		registry.Register("sink", sink)
 		expected := &kube.EnhancedEvent{Message: "hello"}
-		registry.SendEvent("sink", expected)
+		registry.SendEvent(context.Background(), "sink", expected)
 		synctest.Wait()
 
 		require.NotNil(t, sink.sent)
@@ -43,5 +45,20 @@ func TestChannelBasedReceiverRegistrySendAndClose(t *testing.T) {
 
 		registry.Close()
 		require.True(t, sink.closed)
+	})
+}
+
+func TestChannelBasedReceiverRegistryPreservesContext(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		registry := &ChannelBasedReceiverRegistry{}
+		sink := &channelRegistrySinkStub{}
+		registry.Register("sink", sink)
+
+		ctx := context.WithValue(context.Background(), "trace-test", "present")
+		registry.SendEvent(ctx, "sink", &kube.EnhancedEvent{Message: "hello"})
+		synctest.Wait()
+
+		require.Equal(t, "present", sink.ctx.Value("trace-test"))
+		registry.Close()
 	})
 }

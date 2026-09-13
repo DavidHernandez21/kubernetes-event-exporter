@@ -1,11 +1,24 @@
 package exporter
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/sinks"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
+
+func TestTruncateTraceMessage(t *testing.T) {
+	message := strings.Repeat("é", maxTraceMessageRunes+1)
+
+	truncated, length, wasTruncated := truncateTraceMessage(message)
+
+	assert.Equal(t, maxTraceMessageRunes, len([]rune(truncated)))
+	assert.Equal(t, maxTraceMessageRunes+1, length)
+	assert.True(t, wasTruncated)
+	assert.True(t, strings.HasPrefix(message, truncated))
+}
 
 func TestEngineNoRoutes(t *testing.T) {
 	cfg := &Config{
