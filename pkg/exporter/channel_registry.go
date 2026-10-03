@@ -36,7 +36,16 @@ func (r *ChannelBasedReceiverRegistry) SendEvent(ctx context.Context, name strin
 	}
 
 	go func() {
-		ch <- Delivery{Ctx: ctx, Event: *event}
+		dispatchCtx, dispatchSpan := sinkTracer.Start(
+			context.Background(),
+			"kubernetes.event.dispatch",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithLinks(trace.LinkFromContext(ctx)),
+		)
+		dispatchSpan.SetAttributes(attribute.String("k8s.event.receiver", name))
+		defer dispatchSpan.End()
+
+		ch <- Delivery{Ctx: dispatchCtx, Event: *event}
 	}()
 }
 

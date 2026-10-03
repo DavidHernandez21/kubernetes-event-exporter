@@ -14,6 +14,24 @@ High-level architecture diagrams are available in the `docs/` folder:
 - [Flowchart and architecture overview](docs/architecture.md)
 - [Contracts (interfaces) and sequence diagram](docs/contracts.md)
 
+## OpenTelemetry Traces
+
+The exporter creates a `kubernetes.event.process` consumer span for each event. The span includes event fields and
+object reference counts by default. To include the involved object's labels, annotations, and owner references, set
+`emitObjectMetadata` in the application configuration:
+
+```yaml
+emitObjectMetadata: true
+```
+
+When enabled, labels and annotations are emitted as map attributes named `k8s.object.labels` and
+`k8s.object.annotations`. Owner references are emitted as a slice of map values named
+`k8s.object.owner_references`. This metadata can increase span size and may not be indexed by every telemetry
+backend.
+
+For compatibility, setting `OTEL_K8S_OBJECT_METADATA` to any value in the exporter environment also enables this
+option when `emitObjectMetadata` is not set to `true`.
+
 
 ## Deployment
 

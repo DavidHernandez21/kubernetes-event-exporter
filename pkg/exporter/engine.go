@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"time"
+	"unicode/utf8"
 
 	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/kube"
 	"github.com/rs/zerolog/log"
@@ -16,10 +17,13 @@ var tracer = otel.Tracer("github.com/DavidHernandez21/kubernetes-event-exporter/
 
 const maxTraceMessageRunes = 1024
 
+const emitObjectMetadataEnv = "OTEL_K8S_OBJECT_METADATA"
+
 // Engine is responsible for initializing the receivers from sinks
 type Engine struct {
-	Registry ReceiverRegistry
-	Route    Route
+	Registry           ReceiverRegistry
+	Route              Route
+	emitObjectMetadata bool
 }
 
 func NewEngine(config *Config, registry ReceiverRegistry) *Engine {
@@ -39,8 +43,9 @@ func NewEngine(config *Config, registry ReceiverRegistry) *Engine {
 	}
 
 	return &Engine{
-		Route:    config.Route,
-		Registry: registry,
+		Route:              config.Route,
+		Registry:           registry,
+		emitObjectMetadata: config.EmitObjectMetadata,
 	}
 }
 
@@ -48,14 +53,24 @@ func NewEngine(config *Config, registry ReceiverRegistry) *Engine {
 func (e *Engine) OnEvent(event *kube.EnhancedEvent) {
 	ctx, span := tracer.Start(context.Background(), "kubernetes.event.process", trace.WithSpanKind(trace.SpanKindConsumer))
 	defer span.End()
-	span.SetAttributes(eventAttributes(event)...)
+	span.SetAttributes(eventAttributes(event, e.emitObjectMetadata)...)
 
-	e.Route.ProcessEvent(ctx, event, e.Registry)
+	routeCtx, routeSpan := tracer.Start(ctx, "kubernetes.event.route", trace.WithSpanKind(trace.SpanKindInternal))
+	defer routeSpan.End()
+
+	e.Route.ProcessEvent(routeCtx, event, e.Registry)
 }
 
-func eventAttributes(event *kube.EnhancedEvent) []attribute.KeyValue {
+func eventAttributes(event *kube.EnhancedEvent, emitObjectMetadata bool) []attribute.KeyValue {
 	message, messageLength, messageTruncated := truncateTraceMessage(event.Message)
-	attributes := []attribute.KeyValue{
+	// Reserve space for the 23 fixed attributes and up to 3 optional timestamps.
+	attributeCapacity := 23 + 3
+	if emitObjectMetadata {
+		attributeCapacity += len(event.InvolvedObject.Labels) +
+			len(event.InvolvedObject.Annotations) + 1
+	}
+	attributes := make([]attribute.KeyValue, 0, attributeCapacity)
+	attributes = append(attributes,
 		attribute.String("k8s.event.name", event.Name),
 		attribute.String("k8s.event.uid", string(event.UID)),
 		attribute.String("k8s.event.namespace.name", event.Namespace),
@@ -79,6 +94,9 @@ func eventAttributes(event *kube.EnhancedEvent) []attribute.KeyValue {
 		attribute.Int("k8s.object.owner_reference.count", len(event.InvolvedObject.OwnerReferences)),
 		attribute.Int("k8s.object.label.count", len(event.InvolvedObject.Labels)),
 		attribute.Int("k8s.object.annotation.count", len(event.InvolvedObject.Annotations)),
+	)
+	if emitObjectMetadata {
+		attributes = appendObjectMetadataAttributes(attributes, event)
 	}
 
 	if !event.FirstTimestamp.IsZero() {
@@ -94,13 +112,47 @@ func eventAttributes(event *kube.EnhancedEvent) []attribute.KeyValue {
 	return attributes
 }
 
+func appendObjectMetadataAttributes(attributes []attribute.KeyValue, event *kube.EnhancedEvent) []attribute.KeyValue {
+	attributes = append(attributes, stringMapAttributes("k8s.object.label.", event.InvolvedObject.Labels)...)
+	attributes = append(attributes, stringMapAttributes("k8s.object.annotation.", event.InvolvedObject.Annotations)...)
+
+	ownerReferences := make([]attribute.Value, 0, len(event.InvolvedObject.OwnerReferences))
+	for _, owner := range event.InvolvedObject.OwnerReferences {
+		ownerAttributes := []attribute.KeyValue{
+			attribute.String("api_version", owner.APIVersion),
+			attribute.String("kind", owner.Kind),
+			attribute.String("name", owner.Name),
+			attribute.String("uid", string(owner.UID)),
+		}
+		if owner.Controller != nil {
+			ownerAttributes = append(ownerAttributes, attribute.Bool("controller", *owner.Controller))
+		}
+		if owner.BlockOwnerDeletion != nil {
+			ownerAttributes = append(ownerAttributes, attribute.Bool("block_owner_deletion", *owner.BlockOwnerDeletion))
+		}
+		ownerReferences = append(ownerReferences, attribute.Map("owner", ownerAttributes...).Value)
+	}
+	attributes = append(attributes, attribute.Slice("k8s.object.owner_references", ownerReferences...))
+
+	return attributes
+}
+
+func stringMapAttributes(prefix string, values map[string]string) []attribute.KeyValue {
+	entries := make([]attribute.KeyValue, 0, len(values))
+	for entryKey, value := range values {
+		entries = append(entries, attribute.String(prefix+entryKey, value))
+	}
+	return entries
+}
+
 func truncateTraceMessage(message string) (truncated string, length int, wasTruncated bool) {
-	runes := []rune(message)
-	if len(runes) <= maxTraceMessageRunes {
-		return message, len(runes), false
+	length = utf8.RuneCountInString(message)
+	if length <= maxTraceMessageRunes {
+		return message, length, false
 	}
 
-	return string(runes[:maxTraceMessageRunes]), len(runes), true
+	truncatedRunes := []rune(message)
+	return string(truncatedRunes[:maxTraceMessageRunes]), length, true
 }
 
 // Stop stops all registered sinks
