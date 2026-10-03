@@ -34,11 +34,12 @@ func (r *ChannelBasedReceiverRegistry) SendEvent(ctx context.Context, name strin
 	if ch == nil {
 		log.Error().Str("name", name).Msg("There is no channel")
 	}
-
+	dispatchBaseCtx := context.WithoutCancel(ctx)
 	go func() {
 		dispatchCtx, dispatchSpan := sinkTracer.Start(
-			context.Background(),
+			dispatchBaseCtx,
 			"kubernetes.event.dispatch",
+			trace.WithNewRoot(),
 			trace.WithSpanKind(trace.SpanKindInternal),
 			trace.WithLinks(trace.LinkFromContext(ctx)),
 		)
