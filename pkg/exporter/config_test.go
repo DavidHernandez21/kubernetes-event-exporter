@@ -165,6 +165,15 @@ func TestSetDefaults(t *testing.T) {
 	require.Equal(t, defaultCacheTTL, config.CacheTTLDuration())
 }
 
+func TestSetDefaults_EmitObjectMetadataEnvironmentFallback(t *testing.T) {
+	t.Setenv(emitObjectMetadataEnv, "true")
+
+	config := Config{}
+	config.SetDefaults()
+
+	assert.True(t, config.EmitObjectMetadata)
+}
+
 func TestValidate_CacheTTL_InvalidNegative(t *testing.T) {
 	config := Config{CacheTTL: "-1h"}
 	err := config.Validate()

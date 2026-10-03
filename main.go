@@ -7,6 +7,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -21,11 +22,12 @@ import (
 )
 
 var (
-	conf        = flag.String("conf", "config.yaml", "The config path file")
-	addr        = flag.String("metrics-address", ":2112", "The address to listen on for HTTP requests.")
-	kubeconfig  = flag.String("kubeconfig", "", "Path to the kubeconfig file to use.")
-	tlsConf     = flag.String("metrics-tls-config", "", "The TLS config file for your metrics.")
-	enablePprof = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+	conf               = flag.String("conf", "config.yaml", "The config path file")
+	addr               = flag.String("metrics-address", ":2112", "The address to listen on for HTTP requests.")
+	kubeconfig         = flag.String("kubeconfig", "", "Path to the kubeconfig file to use.")
+	tlsConf            = flag.String("metrics-tls-config", "", "The TLS config file for your metrics.")
+	enablePprof        = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+	enableBlockProfile = flag.Bool("enable-block-profile", false, "Enable block profiling")
 )
 
 func main() {
@@ -75,9 +77,14 @@ func run() int {
 
 	enablePprofEffective := *enablePprof
 	var enablePprofFlagSet bool
+	enableBlockProfile := *enableBlockProfile
+	var enableBlockProfileFlagSet bool
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "enable-pprof" {
 			enablePprofFlagSet = true
+		}
+		if f.Name == "enable-block-profile" {
+			enableBlockProfileFlagSet = true
 		}
 	})
 	if !enablePprofFlagSet {
@@ -89,9 +96,25 @@ func run() int {
 			}
 		}
 	}
+	if !enableBlockProfileFlagSet {
+		if v := os.Getenv("ENABLE_BLOCK_PROFILE"); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				enableBlockProfile = b
+			} else {
+				log.Warn().Str("ENABLE_BLOCK_PROFILE", v).Msg("invalid ENABLE_BLOCK_PROFILE value; expected boolean")
+			}
+		}
+	}
 
 	if enablePprofEffective {
 		go func() {
+			// Enable block profiling
+			// The parameter is the sampling rate:
+			// 1 = profile every blocking event (highest accuracy, highest overhead)
+			// 0 = disable block profiling
+			if enableBlockProfile {
+				runtime.SetBlockProfileRate(1)
+			}
 			log.Info().Msg("pprof profiler enabled on :6060")
 			server := &http.Server{
 				Addr:              ":6060",

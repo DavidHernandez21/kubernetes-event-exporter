@@ -34,9 +34,19 @@ func (r *ChannelBasedReceiverRegistry) SendEvent(ctx context.Context, name strin
 	if ch == nil {
 		log.Error().Str("name", name).Msg("There is no channel")
 	}
-
+	dispatchBaseCtx := context.WithoutCancel(ctx)
 	go func() {
-		ch <- Delivery{Ctx: ctx, Event: *event}
+		dispatchCtx, dispatchSpan := sinkTracer.Start(
+			dispatchBaseCtx,
+			"kubernetes.event.dispatch",
+			trace.WithNewRoot(),
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithLinks(trace.LinkFromContext(ctx)),
+		)
+		dispatchSpan.SetAttributes(attribute.String("k8s.event.receiver", name))
+		defer dispatchSpan.End()
+
+		ch <- Delivery{Ctx: dispatchCtx, Event: *event}
 	}()
 }
 

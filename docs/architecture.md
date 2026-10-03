@@ -21,7 +21,12 @@ flowchart TD
     H4 --> I[Engine OnEvent]
     H5 --> I
 
-    I --> J[Route ProcessEvent]
+    I --> OT[Create `kubernetes.event.process` OpenTelemetry consumer span]
+    OT --> OTM{`emitObjectMetadata` enabled in config}
+    OTM -- yes --> OTD[Add labels and annotations as maps; owner references as a slice of maps]
+    OTM -- no --> OTB[Add event fields and object reference counts]
+    OTD --> J[Route ProcessEvent]
+    OTB --> J
 
     J --> K{Any drop rule matches}
     K -- yes --> K1[Stop processing]

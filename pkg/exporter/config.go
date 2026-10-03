@@ -66,9 +66,20 @@ type Config struct {
 	// OmitLookup indicates whether to omit involved
 	// object metadata (Labels, Annotations, OwnerReferences) lookups
 	OmitLookup bool `yaml:"omitLookup,omitempty"`
+
+	// EmitObjectMetadata controls whether object labels, annotations, and owner
+	// references are included in OpenTelemetry spans.
+	EmitObjectMetadata bool `yaml:"emitObjectMetadata,omitempty"`
 }
 
 func (c *Config) SetDefaults() {
+	if !c.EmitObjectMetadata {
+		if _, ok := os.LookupEnv(emitObjectMetadataEnv); ok {
+			c.EmitObjectMetadata = true
+			log.Debug().Msg("using OTEL_K8S_OBJECT_METADATA from environment")
+		}
+	}
+
 	if c.CacheSize == 0 {
 		c.CacheSize = DefaultCacheSize
 		log.Debug().Msg("setting config.cacheSize=1024 (default)")

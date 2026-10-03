@@ -28,7 +28,8 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - -conf=/data/config.yaml
-            - -enable-pprof=true
+            - -enable-pprof=true # or set environment variable ENABLE_PPROF=true
+            - -enable-block-profile=true # or set environment variable ENABLE_BLOCK_PROFILE=true
           volumeMounts:
             - mountPath: /data
               name: cfg
