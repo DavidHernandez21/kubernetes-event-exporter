@@ -17,23 +17,29 @@ import (
 
 var sinkTracer = otel.Tracer("github.com/DavidHernandez21/kubernetes-event-exporter/pkg/exporter")
 
-// ChannelBasedReceiverRegistry creates two channels for each receiver. One is for receiving events and other one is
-// for breaking out of the infinite loop. Each message is passed to receivers
-// This might not be the best way to implement such feature. A ring buffer can be better
-// and we might need a mechanism to drop the vents
-// On closing, the registry sends a signal on all exit channels, and then waits for all to complete.
+// ChannelBasedReceiverRegistry creates a delivery and exit channel for each receiver.
+// Bounded queues are opt-in and drop new events when full. On closing, the registry
+// sends a signal on all exit channels, and then waits for all receivers to complete.
 type ChannelBasedReceiverRegistry struct {
-	ch           map[string]chan Delivery
-	exitCh       map[string]chan struct{}
-	wg           *sync.WaitGroup
-	MetricsStore *metrics.Store
+	ch            map[string]chan Delivery
+	boundedQueues map[string]bool
+	exitCh        map[string]chan struct{}
+	wg            *sync.WaitGroup
+	MetricsStore  *metrics.Store
 }
 
 func (r *ChannelBasedReceiverRegistry) SendEvent(ctx context.Context, name string, event *kube.EnhancedEvent) {
 	ch := r.ch[name]
 	if ch == nil {
 		log.Error().Str("name", name).Msg("There is no channel")
+		return
 	}
+
+	if r.boundedQueues[name] {
+		r.sendBounded(ctx, name, event, ch)
+		return
+	}
+
 	dispatchBaseCtx := context.WithoutCancel(ctx)
 	go func() {
 		dispatchCtx, dispatchSpan := sinkTracer.Start(
@@ -50,17 +56,61 @@ func (r *ChannelBasedReceiverRegistry) SendEvent(ctx context.Context, name strin
 	}()
 }
 
-func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink) {
+func (r *ChannelBasedReceiverRegistry) sendBounded(ctx context.Context, name string, event *kube.EnhancedEvent, ch chan Delivery) {
+	dispatchBaseCtx := context.WithoutCancel(ctx)
+	dispatchCtx, dispatchSpan := sinkTracer.Start(
+		dispatchBaseCtx,
+		"kubernetes.event.dispatch",
+		trace.WithNewRoot(),
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithLinks(trace.LinkFromContext(ctx)),
+	)
+	defer dispatchSpan.End()
+
+	dispatchSpan.SetAttributes(attribute.String("k8s.event.receiver", name))
+	queueAttributes := func(outcome string) []attribute.KeyValue {
+		return []attribute.KeyValue{
+			attribute.String("k8s.event.receiver", name),
+			attribute.Int("k8s.event.queue.capacity", cap(ch)),
+			attribute.Int("k8s.event.queue.length", len(ch)),
+			attribute.String("k8s.event.queue.outcome", outcome),
+		}
+	}
+
+	select {
+	case ch <- Delivery{Ctx: dispatchCtx, Event: *event}:
+		dispatchSpan.AddEvent("receiver.queue.enqueue", trace.WithAttributes(queueAttributes("enqueued")...))
+	default:
+		attributes := queueAttributes("dropped")
+		dispatchSpan.AddEvent("receiver.queue.enqueue", trace.WithAttributes(attributes...))
+		dispatchSpan.AddEvent("receiver.queue.full", trace.WithAttributes(attributes...))
+		dispatchSpan.SetStatus(codes.Error, "receiver queue full")
+		if r.MetricsStore != nil {
+			metrics.IncWithTrace(dispatchCtx, r.MetricsStore.ReceiverQueueDrops.WithLabelValues(name))
+		}
+		log.Warn().Str("sink", name).Str("event", event.Message).Int("queueCapacity", cap(ch)).Msg("Dropping event because receiver queue is full")
+	}
+}
+
+func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink, options ReceiverOptions) {
 	if r.ch == nil {
 		r.ch = make(map[string]chan Delivery)
+		r.boundedQueues = make(map[string]bool)
 		r.exitCh = make(map[string]chan struct{})
 	}
 
 	ch := make(chan Delivery)
+	if options.EnableBoundedQueue {
+		ch = make(chan Delivery, options.QueueCapacity)
+	}
 	exitCh := make(chan struct{})
 
 	r.ch[name] = ch
+	r.boundedQueues[name] = options.EnableBoundedQueue
 	r.exitCh[name] = exitCh
+	if options.EnableBoundedQueue {
+		log.Info().Str("sink", name).Int("queueCapacity", options.QueueCapacity).Msg("Bounded receiver queue enabled")
+	}
 
 	if r.wg == nil {
 		r.wg = &sync.WaitGroup{}
@@ -97,7 +147,10 @@ func (r *ChannelBasedReceiverRegistry) Register(name string, receiver sinks.Sink
 // The wait could block indefinitely depending on the sink implementations.
 func (r *ChannelBasedReceiverRegistry) Close() {
 	// Send exit command and wait for exit of all sinks
-	for _, ec := range r.exitCh {
+	for name, ec := range r.exitCh {
+		if queued := len(r.ch[name]); queued > 0 {
+			log.Warn().Str("sink", name).Int("queued", queued).Msg("Closing sink with queued events that may be discarded")
+		}
 		ec <- struct{}{}
 	}
 	r.wg.Wait()

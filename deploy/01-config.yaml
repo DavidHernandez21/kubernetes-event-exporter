@@ -8,10 +8,13 @@ data:
     logLevel: warn
     logFormat: json
     metricsNamePrefix: event_exporter_
+    # Opt in to bounded, non-blocking receiver queues. New events are dropped when a queue is full.
+    enableBoundedReceiverQueues: true
     route:
       routes:
         - match:
             - receiver: "dump"
     receivers:
       - name: "dump"
+        queueCapacity: 1024
         stdout: {}

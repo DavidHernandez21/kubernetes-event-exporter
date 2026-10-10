@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DavidHernandez21/kubernetes-event-exporter/pkg/sinks"
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -163,6 +164,28 @@ func TestSetDefaults(t *testing.T) {
 	require.Equal(t, "12h0m0s", config.CacheTTL)
 	require.NoError(t, config.Validate())
 	require.Equal(t, defaultCacheTTL, config.CacheTTLDuration())
+}
+
+func TestValidate_BoundedReceiverQueuesRequiresExplicitCapacity(t *testing.T) {
+	config := Config{
+		EnableBoundedReceiverQueues: true,
+		Receivers: []sinks.ReceiverConfig{
+			{Name: "missing"},
+		},
+	}
+
+	require.ErrorContains(t, config.Validate(), "receiver \"missing\" queueCapacity must be positive")
+}
+
+func TestValidate_BoundedReceiverQueuesAcceptsExplicitPositiveCapacity(t *testing.T) {
+	config := Config{
+		EnableBoundedReceiverQueues: true,
+		Receivers: []sinks.ReceiverConfig{
+			{Name: "configured", QueueCapacity: 1024},
+		},
+	}
+
+	require.NoError(t, config.Validate())
 }
 
 func TestSetDefaults_EmitObjectMetadataEnvironmentFallback(t *testing.T) {

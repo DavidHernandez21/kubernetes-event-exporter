@@ -26,6 +26,7 @@ type ReceiverConfig struct {
 	EventBridge   *EventBridgeConfig   `yaml:"eventbridge"`
 	Pipe          *PipeConfig          `yaml:"pipe"`
 	Name          string               `yaml:"name"`
+	QueueCapacity int                  `yaml:"queueCapacity,omitempty"`
 }
 
 func (r *ReceiverConfig) Validate() error {
