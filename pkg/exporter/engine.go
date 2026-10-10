@@ -39,7 +39,10 @@ func NewEngine(config *Config, registry ReceiverRegistry) *Engine {
 			Str("type", reflect.TypeOf(sink).String()).
 			Msg("Registering sink")
 
-		registry.Register(v.Name, sink)
+		registry.Register(v.Name, sink, ReceiverOptions{
+			EnableBoundedQueue: config.EnableBoundedReceiverQueues,
+			QueueCapacity:      v.QueueCapacity,
+		})
 	}
 
 	return &Engine{

@@ -63,6 +63,10 @@ type Config struct {
 	// KubeQPS is the maximum QPS to the Kubernetes API server
 	KubeQPS float32 `yaml:"kubeQPS,omitempty"`
 
+	// EnableBoundedReceiverQueues enables bounded, non-blocking queues for receivers.
+	// It defaults to false during the initial rollout to preserve legacy behavior.
+	EnableBoundedReceiverQueues bool `yaml:"enableBoundedReceiverQueues,omitempty"`
+
 	// OmitLookup indicates whether to omit involved
 	// object metadata (Labels, Annotations, OwnerReferences) lookups
 	OmitLookup bool `yaml:"omitLookup,omitempty"`
@@ -126,6 +130,9 @@ func (c *Config) Validate() error {
 	if err := c.validateMetricsNamePrefix(); err != nil {
 		return err
 	}
+	if err := c.validateReceiverQueueCapacities(); err != nil {
+		return err
+	}
 
 	// Precompile all regex patterns
 	err := c.PreCompilePatterns()
@@ -145,6 +152,20 @@ func (c *Config) validateDefaults() error {
 	}
 	if err := c.validateCacheTTL(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *Config) validateReceiverQueueCapacities() error {
+	if !c.EnableBoundedReceiverQueues {
+		return nil
+	}
+
+	for index := range c.Receivers {
+		receiver := &c.Receivers[index]
+		if receiver.QueueCapacity <= 0 {
+			return fmt.Errorf("receiver %q queueCapacity must be positive when enableBoundedReceiverQueues is true", receiver.Name)
+		}
 	}
 	return nil
 }

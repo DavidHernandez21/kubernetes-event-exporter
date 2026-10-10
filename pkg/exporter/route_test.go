@@ -18,7 +18,7 @@ type testReceiverRegistry struct {
 	rcvd map[string][]*kube.EnhancedEvent
 }
 
-func (t *testReceiverRegistry) Register(string, sinks.Sink) {
+func (t *testReceiverRegistry) Register(string, sinks.Sink, ReceiverOptions) {
 	panic("Why do you call this? It's for counting imaginary events for tests only")
 }
 

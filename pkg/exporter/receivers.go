@@ -12,9 +12,14 @@ type Delivery struct {
 	Event kube.EnhancedEvent
 }
 
+type ReceiverOptions struct {
+	EnableBoundedQueue bool
+	QueueCapacity      int
+}
+
 // ReceiverRegistry registers a receiver with the appropriate sink
 type ReceiverRegistry interface {
 	SendEvent(context.Context, string, *kube.EnhancedEvent)
-	Register(string, sinks.Sink)
+	Register(string, sinks.Sink, ReceiverOptions)
 	Close()
 }

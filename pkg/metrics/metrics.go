@@ -20,6 +20,7 @@ type Store struct {
 	EventsDiscarded            prometheus.Counter
 	WatchErrors                prometheus.Counter
 	SendErrors                 prometheus.Counter
+	ReceiverQueueDrops         *prometheus.CounterVec
 	BuildInfo                  prometheus.GaugeFunc
 	KubeApiReadCacheHits       prometheus.Counter
 	KubeApiMappingCacheHits    prometheus.Counter
@@ -134,6 +135,10 @@ func NewMetricsStore(name_prefix string) *Store {
 			Name: name_prefix + "send_event_errors",
 			Help: "The total number of send event errors",
 		}),
+		ReceiverQueueDrops: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: name_prefix + "receiver_queue_dropped_events",
+			Help: "The total number of events dropped because a receiver queue was full",
+		}, []string{"receiver"}),
 		KubeApiReadCacheHits: promauto.NewCounter(prometheus.CounterOpts{
 			Name: name_prefix + "kube_api_read_cache_hits",
 			Help: "The total number of read requests served from cache when looking up object metadata",
@@ -158,6 +163,7 @@ func DestroyMetricsStore(store *Store) {
 	prometheus.Unregister(store.EventsDiscarded)
 	prometheus.Unregister(store.WatchErrors)
 	prometheus.Unregister(store.SendErrors)
+	prometheus.Unregister(store.ReceiverQueueDrops)
 	prometheus.Unregister(store.BuildInfo)
 	prometheus.Unregister(store.KubeApiReadCacheHits)
 	prometheus.Unregister(store.KubeApiReadRequests)

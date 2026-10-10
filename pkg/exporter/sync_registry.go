@@ -36,7 +36,7 @@ func (s *SyncRegistry) SendEvent(ctx context.Context, name string, event *kube.E
 	span.End()
 }
 
-func (s *SyncRegistry) Register(name string, sink sinks.Sink) {
+func (s *SyncRegistry) Register(name string, sink sinks.Sink, _ ReceiverOptions) {
 	if s.reg == nil {
 		s.reg = make(map[string]sinks.Sink)
 	}

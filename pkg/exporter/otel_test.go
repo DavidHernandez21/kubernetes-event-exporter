@@ -74,7 +74,7 @@ func (failingSink) Close() {}
 func TestSyncRegistryEmitsChildSinkErrorSpan(t *testing.T) {
 	testSpanExporter.Reset()
 	registry := &SyncRegistry{}
-	registry.Register("loki", failingSink{})
+	registry.Register("loki", failingSink{}, ReceiverOptions{})
 
 	parentContext, parentSpan := tracer.Start(context.Background(), "test.event")
 	registry.SendEvent(parentContext, "loki", &kube.EnhancedEvent{})
@@ -105,7 +105,7 @@ func TestChannelRegistryEmitsDispatchSpanBeforeSinkSpan(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		registry := &ChannelBasedReceiverRegistry{}
 		sink := &channelRegistrySinkStub{}
-		registry.Register("loki", sink)
+		registry.Register("loki", sink, ReceiverOptions{})
 
 		parentContext, parentSpan := tracer.Start(context.Background(), "test.event")
 		registry.SendEvent(parentContext, "loki", &kube.EnhancedEvent{Message: "hello"})

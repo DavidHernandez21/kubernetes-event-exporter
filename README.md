@@ -98,6 +98,37 @@ receivers:
 * A route can have many sub-routes, forming a tree.
 * Routing starts from the root route.
 
+### Bounded Receiver Queues
+
+Set `enableBoundedReceiverQueues` to enable a bounded FIFO queue for every receiver. The feature is disabled by
+default during its initial rollout, which preserves the legacy dispatch behavior. When enabled, every receiver must
+declare a positive `queueCapacity`; there is deliberately no default. Add a capacity for every receiver before
+enabling the feature so the configuration is ready when bounded queues become the default.
+
+When a receiver queue is full, the exporter drops the new event rather than blocking event routing. Drops are counted
+by the receiver-labeled `receiver_queue_dropped_events` metric. Dispatch traces include queue capacity, a best-effort
+queue-length snapshot, and the enqueue outcome, so saturation can be inspected with the event that encountered it.
+
+Set capacity from each receiver's routed event rate and the burst or outage duration the queue should absorb:
+
+$$
+queueCapacity \approx eventsPerSecond \times toleratedPauseSeconds
+$$
+
+The maximum number of queued deliveries across the process is the sum of every configured capacity. Channel buffers
+are allocated when receivers are registered, and queued deliveries retain their event payload and trace context. Size
+the aggregate intentionally: 1,000 receivers with a capacity of 1,024 permit 1,024,000 queued deliveries. Queued
+events may be discarded during shutdown, so capacity is for absorbing transient receiver backpressure, not durable
+delivery. The queue trace fields and drop metric provide the evidence needed to tune each receiver.
+
+```yaml
+enableBoundedReceiverQueues: true
+receivers:
+  - name: "events"
+    queueCapacity: 2048
+    stdout: {}
+```
+
 ## Using Secrets
 
 In your config file, you can refer to environment variables as `${API_KEY}` therefore you can use ConfigMap or Secrets

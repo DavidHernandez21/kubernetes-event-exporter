@@ -46,8 +46,13 @@ flowchart TD
     U --> U1[Channel based registry]
     U --> U2[Synchronous registry]
 
-    U1 --> V[Async channel delivery]
-    V --> W[Invoke sink Send]
+    U1 --> V{Bounded receiver queues enabled}
+    V -- no --> V1[Legacy dispatch goroutine waits for receiver]
+    V -- yes --> V2{Receiver queue has capacity}
+    V2 -- yes --> V3[Enqueue delivery]
+    V2 -- no --> V4[Drop new delivery and increment queue-drop metric]
+    V1 --> W[Invoke sink Send]
+    V3 --> W
     U2 --> W
 
     W --> X[Concrete sinks]
